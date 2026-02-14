@@ -33,8 +33,8 @@ proof-
     by metis
   interpret L_setind "(\<^bold>\<in>)"
   proof
-    show "zffin.SetFormulaPredicate P \<Longrightarrow> \<forall>x. P (\<Xi>(0 := zffin.empty_setM)) \<longrightarrow>
-        (\<forall>x y. P (\<Xi>(0 := x)) \<longrightarrow> P (\<Xi>(0 := zffin.binunionM x (zffin.singletonM y)))) \<longrightarrow> P (\<Xi>(0 := x))" for P \<Xi>
+    show "zffin.SetFormulaPredicate P \<Longrightarrow>  P (\<Xi>(0 := zffin.empty_setM)) \<longrightarrow>
+        (\<forall>x y. P (\<Xi>(0 := x)) \<longrightarrow> P (\<Xi>(0 := zffin.binunionM x (zffin.singletonM y)))) \<longrightarrow> (\<forall>x. P (\<Xi>(0 := x)))" for P \<Xi>
       unfolding zffin_suc zffin_emp using hf_induct[of "\<lambda> a. P (\<Xi>(0:=a))"] by blast  
   qed
   interpret L_setext_empty_setsuc_setind "(\<^bold>\<in>)"

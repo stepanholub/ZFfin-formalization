@@ -2,7 +2,6 @@
     Author:     Štěpán Holub, Charles University
 *)
 
-
 theory ZFfin
 
 imports Main
@@ -1528,11 +1527,126 @@ lemma rel_inv_rel: "relationM f \<Longrightarrow> relationM (rel_inverseM f)"
 lemma one_one_inv: "one_oneM f \<Longrightarrow> one_oneM (rel_inverseM f)"
   unfolding one_oneM_def rel_inv_def' functionM_def ordered_pair_unique using rel_inv_rel by auto
 
-lemma fun_inj: "functionM f \<Longrightarrow> \<langle>a,b\<rangle> \<epsilon> f \<Longrightarrow> \<langle>a,c\<rangle> \<epsilon> f \<Longrightarrow>  b = c"
+lemma funD: "functionM f \<Longrightarrow> \<langle>a,b\<rangle> \<epsilon> f \<Longrightarrow> \<langle>a,c\<rangle> \<epsilon> f \<Longrightarrow>  b = c"
   unfolding functionM_def by blast
 
 lemma one_one_inj: "one_oneM f \<Longrightarrow> \<langle>b,a\<rangle> \<epsilon> f \<Longrightarrow> \<langle>c,a\<rangle> \<epsilon> f \<Longrightarrow>  b = c"
   unfolding one_oneM_def by blast
+
+lemma dedekind_finite_suc: assumes "dedekind_fin x" shows "dedekind_fin (x \<union>\<^sub>M {t}\<^sub>M)"
+proof (cases "t \<epsilon> x") 
+  assume "\<not> t \<epsilon> x"
+  show ?thesis
+    unfolding dedekind_fin_def  
+  proof (rule, rule)
+    have IH: "u \<subset>\<^sub>M x \<Longrightarrow> x \<approx>\<^sub>M u \<Longrightarrow> False" for u
+      using assms unfolding dedekind_fin_def  by blast
+    show "\<not> x \<union>\<^sub>M {t}\<^sub>M \<approx>\<^sub>M y" if "y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M" for y
+    proof
+      assume "x \<union>\<^sub>M {t}\<^sub>M \<approx>\<^sub>M y"
+      then obtain f where f_bij: "one_oneM f" and f_dom: "domM f = x \<union>\<^sub>M {t}\<^sub>M" and f_rng: "rngM f = y" 
+        unfolding set_equivalent_def by force
+      obtain ft where "\<langle>t,ft\<rangle> \<epsilon> f"
+        using f_dom[unfolded setext dom_def', rule_format, of t] unfolding pow_setsuc_def' by force
+          \<comment> \<open>From this we construct a bijection \<open>g\<close> between  strict subset \<open>y'\<close> of \<open>x\<close> and \<open>x\<close>
+       There are two different constructions. Depending on whether removing the pair \<open>fx,x\<close> from \<open>f\<close> 
+       yields directly a bijection of \<open>x\<close> on its subset, or whether a modification is needed. 
+       \<close>
+      have "ft \<epsilon> y"
+        using \<open>rngM f = y\<close> \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> unfolding setext rng_def' by blast
+      consider "t \<epsilon> y \<and> ft \<noteq> t" | "y \<subseteq>\<^sub>M x \<or> ft = t" 
+        using \<open>y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M\<close> unfolding subsetM_def proper_subsetM_def pow_setsuc_def' by blast
+      then show False
+      proof (cases) 
+        assume "y \<subseteq>\<^sub>M x \<or> ft = t" 
+          \<comment> \<open>First construction just removes \<open>\<langle>t,ft\<rangle>\<close>\<close>
+        obtain y' where y': "\<forall> u. u \<epsilon> y' \<longleftrightarrow> u \<epsilon> y \<and> u \<noteq> ft"
+          using sep_sr[rule_format, of "(\<noteq>)"] unfolding SetRelation_def by force 
+        obtain g where g: "\<forall> u. u \<epsilon> g \<longleftrightarrow> u \<epsilon> f \<and> u \<noteq> \<langle>t,ft\<rangle>"
+          using sep_sr[rule_format, of "(\<noteq>)"] unfolding SetRelation_def by force 
+        show False
+        proof (rule IH)
+          show "y' \<subset>\<^sub>M x"
+            using y' \<open>y \<subseteq>\<^sub>M x \<or> ft = t\<close>[unfolded subsetM_def] \<open>ft \<epsilon> y\<close> proper_subsetM_def \<open>y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M\<close>[unfolded proper_subsetM_def pow_setsuc_def' setext[of y]] by metis 
+          show "x \<approx>\<^sub>M y'"
+          proof-  
+            have "one_oneM g"
+              using \<open>one_oneM f\<close> g unfolding one_oneM_def functionM_def relationM_def by blast
+            have "domM g = x"
+              using funD[OF conjunct1[OF f_bij[unfolded one_oneM_def]] \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close>] f_dom  \<open>\<not> t \<epsilon> x\<close>  
+              unfolding setext[of "domM _"] dom_def' y'[rule_format] g[rule_format] one_oneM_def functionM_def pow_setsuc_def' ordered_pair_unique 
+              by auto
+            have "rngM g = y'"
+              using one_one_inj[OF f_bij \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close>] f_rng 
+              unfolding setext[of "rngM _"] rng_def' y'[rule_format] g[rule_format] ordered_pair_unique
+              by blast
+            show "x \<approx>\<^sub>M y'"
+              unfolding set_equivalent_def using \<open>rngM g = y'\<close> \<open>domM g = x\<close> \<open>one_oneM g\<close>  by blast 
+          qed
+        qed
+      next
+        assume "t \<epsilon> y \<and> ft \<noteq> t"
+        then obtain pt where "\<langle>pt,t\<rangle> \<epsilon> f"
+          using f_rng[unfolded setext rng_def', rule_format, of t] by blast
+        hence "pt \<epsilon> x"
+          using f_dom[unfolded setext[of "domM _"] dom_def' pow_setsuc_def']
+            one_oneD3[OF f_bij, rule_format, of t ft t] \<open>\<langle>pt,t\<rangle> \<epsilon> f\<close> \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> \<open>t \<epsilon> y \<and> ft \<noteq> t\<close> by blast  
+        then show False
+        proof- 
+          \<comment> \<open>the second construction requires to modify the mapping \<open>f\<close> by adding \<open>\<langle>fx,px\<rangle>\<close>, not just to restrict \<open>f\<close>\<close>
+          obtain y' where y': "\<forall> u. u \<epsilon> y' \<longleftrightarrow> u \<epsilon> y \<and> u \<noteq> t"
+            using sep_sr[rule_format, of "(\<noteq>)"] unfolding SetRelation_def by force
+          have sfp: "SetFormulaPredicate (\<lambda> \<Xi>. \<Xi> 0 = \<langle>\<Xi> 1,\<Xi> 2\<rangle> \<or> (\<Xi> 0 \<epsilon> \<Xi> 4 \<and> \<Xi> 0 \<noteq> \<langle>\<Xi> 3,\<Xi> 2\<rangle> \<and> \<Xi> 0 \<noteq> \<langle>\<Xi> 1,\<Xi> 3\<rangle>))"
+            unfolding logsimps by rule+
+          obtain g where g: "\<forall> u. u \<epsilon> g \<longleftrightarrow> (u = \<langle>pt,ft\<rangle> \<or> (u \<epsilon> f \<and> u \<noteq> \<langle>t,ft\<rangle> \<and> u \<noteq> \<langle>pt,t\<rangle>))"
+            using sep[rule_format, OF sfp, of "f \<union>\<^sub>M {\<langle>pt,ft\<rangle>}\<^sub>M" "undefined(1:=pt, 2:=ft, 3:= t ,4:=f)", simplified] by auto           
+          show False
+          proof (rule IH)
+            show "y' \<subset>\<^sub>M x"
+              using \<open>y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M\<close> \<open>t \<epsilon> y \<and> ft \<noteq> t\<close> unfolding proper_subsetM_def y'[rule_format] pow_setsuc_def' setext[of y] setext[of y'] by blast
+            show "x \<approx>\<^sub>M y'"
+            proof-  
+              have "one_oneM g"
+                by (rule one_oneI, unfold g[rule_format] ordered_pair_unique) 
+                (use one_oneD1[OF f_bij] in blast, 
+                use one_oneD2[OF f_bij] \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> in blast,
+                use one_oneD3[OF f_bij] \<open>\<langle>pt,t\<rangle> \<epsilon> f\<close> in blast) 
+              have "domM g = x"
+                unfolding setext[of "domM _"] dom_def' 
+              proof (rule, rule)
+                fix z assume "\<exists>v. \<langle>z,v\<rangle> \<epsilon> g" 
+                show "z \<epsilon> x"
+                  using \<open>\<exists>v. \<langle>z,v\<rangle> \<epsilon> g\<close> \<open>pt \<epsilon> x\<close>  one_oneD3[OF f_bij, rule_format, of t ft _] \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> f_dom[unfolded setext[of "domM _"] pow_setsuc_def' dom_def'] unfolding ordered_pair_unique 
+                    g[rule_format] by blast
+              next
+                fix z assume " z \<epsilon> x" 
+                then show "\<exists>v. \<langle>z,v\<rangle> \<epsilon> g"
+                  unfolding g[rule_format] using f_dom[unfolded setext[of "domM _"] pow_setsuc_def' dom_def'] by (cases "z = pt") (use \<open>\<not> t \<epsilon> x\<close> in auto) 
+              qed
+              have "rngM g = y'"
+                unfolding setext[of "rngM _"] rng_def'
+              proof (rule, rule)
+                fix z assume "\<exists>v. \<langle>v,z\<rangle> \<epsilon> g"
+                show "z \<epsilon> y'"
+                  using 
+                    one_oneD2[OF f_bij]
+                   \<open>\<exists>v. \<langle>v,z\<rangle> \<epsilon> g\<close> \<open>ft \<epsilon> y\<close> \<open>t \<epsilon> y \<and> ft \<noteq> t\<close>  \<open>\<langle>pt,t\<rangle> \<epsilon> f\<close> \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close>
+                  unfolding f_rng[unfolded setext[of "rngM _"]  rng_def', rule_format, symmetric, of z]  y'[rule_format] ordered_pair_unique g[rule_format] by blast
+              next
+                fix z assume "z \<epsilon> y'"
+                show "\<exists>v. \<langle>v,z\<rangle> \<epsilon> g"
+                  using \<open>z \<epsilon> y'\<close>[unfolded y'[rule_format]]
+                  unfolding f_rng[unfolded setext[of "rngM _"]  rng_def', rule_format, symmetric, of z] g[rule_format] ordered_pair_unique by blast
+              qed
+              show "x \<approx>\<^sub>M y'"
+                unfolding set_equivalent_def using \<open>rngM g = y'\<close> \<open>domM g = x\<close> \<open>one_oneM g\<close>  by blast 
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed (simp add: assms)
 
 lemma set_equivalent_sym: "x \<approx>\<^sub>M y \<longleftrightarrow> y \<approx>\<^sub>M x"
 proof-
@@ -1961,373 +2075,6 @@ lemma setsuc_def'[set_defs]: "u \<epsilon> x\<union>\<^sub>M{y}\<^sub>M \<longle
 
 end 
 
-subsection \<open>Negation of inf\<close>
-
-locale L_setext_empty_power_union_repl_fin  = L_setext + L_empty + L_power + L_union + L_repl +  L_fin
-
-begin
-
-sublocale L_setext_empty_repl
-     by unfold_locales
-
-sublocale L_setext_empty
-  by unfold_locales
-
-sublocale L_setext_empty_power_union_repl
-  by unfold_locales
-
-lemma nat_induction_sfp: assumes "SetFormulaPredicate P" and  "P (\<Xi>(0:=\<emptyset>))" and "natM x" and
-  step: "\<And> x. natM x \<Longrightarrow> P (\<Xi>(0:=x)) \<Longrightarrow> P (\<Xi>(0:=x \<union>\<^sub>M {x}\<^sub>M))"
-  shows "P (\<Xi>(0:=x))"
-proof (rule ccontr)
-  assume "\<not> P (\<Xi>(0:=x))"
-  define v where "v = separationM x (\<lambda> x. P(\<Xi>(0:=x)))"
-  from separ_def_sfp[OF \<open>SetFormulaPredicate P\<close>]
-  have v: "u \<epsilon> v \<longleftrightarrow> u \<epsilon> x \<and> P(\<Xi>(0:=u))" for u
-    unfolding v_def by simp 
-  hence "\<emptyset> \<epsilon> v"
-    using \<open>P (\<Xi>(0:=\<emptyset>))\<close> \<open>\<not> P (\<Xi>(0:=x))\<close> \<open>natM x\<close> emp_natM empty_is_empty ordM_total unfolding natM_def by blast
-  have "(y \<union>\<^sub>M {y}\<^sub>M) \<epsilon> v" if "y \<epsilon> v" for y
-   unfolding v[of "y \<union>\<^sub>M {y}\<^sub>M"] using \<open>\<not> P (\<Xi>(0:=x))\<close> \<open>natM x\<close> that[unfolded v[of y]] step[of y] ord_mem_suc[of x y] mem_nat_nat[of y x] natM_D1[OF \<open>natM x\<close>] by fast
-  thus False
-    using \<open>\<emptyset> \<epsilon> v\<close> fin by auto
-qed
-
-lemma nat_induction_sp: assumes "SetProperty P" and  "P \<emptyset>" and "natM x" and
-  step: "\<And> x. natM x \<Longrightarrow> P x \<Longrightarrow> P (x \<union>\<^sub>M {x}\<^sub>M)"
-shows "P x"
-  using assms unfolding SetProperty_def using nat_induction_sfp by force  
-
-end
-
-locale L_setext_empty_power_union_repl_reg_fin  = L_setext + L_empty + L_power + L_union + L_repl + L_reg + L_fin
-
-begin
-
-sublocale L_setext_empty_power_union_repl_fin
-  by unfold_locales
-
-sublocale L_setext_empty_power_union_repl_reg
-  by unfold_locales
-
-
-lemma SR_card: "SetRelation cardinality"
-  unfolding set_defs logsimps SetRelation_def by rule+
-
-lemma card_suc: assumes "\<not> y \<epsilon> x" "cardinality x m" shows "cardinality (x \<union>\<^sub>M {y}\<^sub>M)  (m \<union>\<^sub>M {m}\<^sub>M)"
-proof-
-  obtain f where "one_oneM f" "x = domM f" "m = rngM f" "natM m"
-    using \<open>cardinality x m\<close> unfolding cardinality_def set_equivalent_def by blast
-  let ?f = "f \<union>\<^sub>M {\<langle>y,m\<rangle>}\<^sub>M"
-  have "natM (m \<union>\<^sub>M {m}\<^sub>M)"
-    by (simp add: \<open>natM m\<close> nat_suc_nat)
-  have "x \<union>\<^sub>M {y}\<^sub>M = domM ?f"
-    using \<open>x = domM f\<close> unfolding setext dom_def' by auto
-  have "m \<union>\<^sub>M {m}\<^sub>M = rngM ?f"
-    using \<open>m = rngM f\<close> unfolding setext rng_def' by auto
-  have "relationM ?f"
-    unfolding relationM_def
-    using \<open>one_oneM f\<close> functionM_def one_oneM_def relationM_def by auto 
-  then have "functionM ?f"
-    unfolding functionM_def
-    using \<open>one_oneM f\<close> \<open>x = domM f\<close> \<open>\<not> y \<epsilon> x\<close> dom_def' fun_inj one_oneD3 by auto 
-  then have "one_oneM ?f"
-    unfolding one_oneM_def 
-    using   \<open>\<not> y \<epsilon> x\<close> one_one_inj[OF \<open>one_oneM f\<close>] \<open>m = rngM f\<close> mem_not_refl[of m] 
-    rng_def'  by auto 
-  show ?thesis
-    unfolding cardinality_def set_equivalent_def 
-    using \<open>m \<union>\<^sub>M {m}\<^sub>M = rngM ?f\<close> \<open>natM (m \<union>\<^sub>M {m}\<^sub>M)\<close> \<open>one_oneM ?f\<close> \<open>x \<union>\<^sub>M {y}\<^sub>M = domM ?f\<close> by blast
-qed                                    
-
-lemma card_emp: "cardinality \<emptyset> \<emptyset>" 
-proof-
-  have "natM \<emptyset>"
-    by simp
-  moreover have "one_oneM \<emptyset>" 
-    unfolding one_oneM_def functionM_def relationM_def by simp
-  moreover have "\<emptyset> = domM \<emptyset>" "\<emptyset> = rngM \<emptyset>"                          
-    unfolding setext dom_def' rng_def' by simp_all 
-  ultimately show ?thesis
-    unfolding cardinality_def set_equivalent_def 
-    using exI[of "\<lambda> f.  one_oneM f \<and> \<emptyset> = domM f \<and> \<emptyset> = rngM f" \<emptyset>] by blast
-qed
-
-lemma dedekind_finite_suc: assumes "dedekind_fin x" shows "dedekind_fin (x \<union>\<^sub>M {t}\<^sub>M)"
-proof (cases "t \<epsilon> x") 
-  assume "\<not> t \<epsilon> x"
-  show ?thesis
-    unfolding dedekind_fin_def  
-  proof (rule, rule)
-    have IH: "u \<subset>\<^sub>M x \<Longrightarrow> x \<approx>\<^sub>M u \<Longrightarrow> False" for u
-      using assms unfolding dedekind_fin_def  by blast
-    show "\<not> x \<union>\<^sub>M {t}\<^sub>M \<approx>\<^sub>M y" if "y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M" for y
-    proof
-      assume "x \<union>\<^sub>M {t}\<^sub>M \<approx>\<^sub>M y"
-      then obtain f where f_bij: "one_oneM f" and f_dom: "domM f = x \<union>\<^sub>M {t}\<^sub>M" and f_rng: "rngM f = y" 
-        unfolding set_equivalent_def by force
-      obtain ft where "\<langle>t,ft\<rangle> \<epsilon> f"
-        using f_dom[unfolded setext dom_def', rule_format, of t] unfolding pow_setsuc_def' by force
-          \<comment> \<open>From this we construct a bijection \<open>g\<close> between  strict subset \<open>y'\<close> of \<open>x\<close> and \<open>x\<close>
-       There are two different constructions. Depending on whether removing the pair \<open>fx,x\<close> from \<open>f\<close> 
-       yields directly a bijection of \<open>x\<close> on its subset, or whether a modification is needed. 
-       \<close>
-      have "ft \<epsilon> y"
-        using \<open>rngM f = y\<close> \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> unfolding setext rng_def' by blast
-      consider "t \<epsilon> y \<and> ft \<noteq> t" | "y \<subseteq>\<^sub>M x \<or> ft = t" 
-        using \<open>y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M\<close> unfolding subsetM_def proper_subsetM_def pow_setsuc_def' by blast
-      then show False
-      proof (cases) 
-        assume "y \<subseteq>\<^sub>M x \<or> ft = t" 
-          \<comment> \<open>First construction just removes \<open>\<langle>t,ft\<rangle>\<close>\<close>
-        obtain y' where y': "\<forall> u. u \<epsilon> y' \<longleftrightarrow> u \<epsilon> y \<and> u \<noteq> ft"
-          using sep_sr[rule_format, of "(\<noteq>)"] unfolding SetRelation_def by force 
-        obtain g where g: "\<forall> u. u \<epsilon> g \<longleftrightarrow> u \<epsilon> f \<and> u \<noteq> \<langle>t,ft\<rangle>"
-          using sep_sr[rule_format, of "(\<noteq>)"] unfolding SetRelation_def by force 
-        show False
-        proof (rule IH)
-          show "y' \<subset>\<^sub>M x"
-            using y' \<open>y \<subseteq>\<^sub>M x \<or> ft = t\<close>[unfolded subsetM_def] \<open>ft \<epsilon> y\<close> proper_subsetM_def \<open>y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M\<close>[unfolded proper_subsetM_def pow_setsuc_def' setext[of y]] by metis 
-          show "x \<approx>\<^sub>M y'"
-          proof-  
-            have "one_oneM g"
-              using \<open>one_oneM f\<close> g unfolding one_oneM_def functionM_def relationM_def by blast
-            have "domM g = x"
-              using fun_inj[OF conjunct1[OF f_bij[unfolded one_oneM_def]] \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close>] f_dom mem_not_refl \<open>\<not> t \<epsilon> x\<close>  
-              unfolding setext[of "domM _"] dom_def' y'[rule_format] g[rule_format] one_oneM_def functionM_def pow_setsuc_def' ordered_pair_unique by blast
-            have "rngM g = y'"
-              using one_one_inj[OF f_bij \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close>] f_rng 
-              unfolding setext[of "rngM _"] rng_def' y'[rule_format] g[rule_format] ordered_pair_unique
-              by blast
-            show "x \<approx>\<^sub>M y'"
-              unfolding set_equivalent_def using \<open>rngM g = y'\<close> \<open>domM g = x\<close> \<open>one_oneM g\<close>  by blast 
-          qed
-        qed
-      next
-        assume "t \<epsilon> y \<and> ft \<noteq> t"
-        then obtain pt where "\<langle>pt,t\<rangle> \<epsilon> f"
-          using f_rng[unfolded setext rng_def', rule_format, of t] by blast
-        hence "pt \<epsilon> x"
-          using f_dom[unfolded setext[of "domM _"] dom_def' pow_setsuc_def']
-            one_oneD3[OF f_bij, rule_format, of t ft t] \<open>\<langle>pt,t\<rangle> \<epsilon> f\<close> \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> \<open>t \<epsilon> y \<and> ft \<noteq> t\<close> by blast  
-        then show False
-        proof- 
-          \<comment> \<open>the second construction requires to modify the mapping \<open>f\<close> by adding \<open>\<langle>fx,px\<rangle>\<close>, not just to restrict \<open>f\<close>\<close>
-          obtain y' where y': "\<forall> u. u \<epsilon> y' \<longleftrightarrow> u \<epsilon> y \<and> u \<noteq> t"
-            using sep_sr[rule_format, of "(\<noteq>)"] unfolding SetRelation_def by force
-          have sfp: "SetFormulaPredicate (\<lambda> \<Xi>. \<Xi> 0 = \<langle>\<Xi> 1,\<Xi> 2\<rangle> \<or> (\<Xi> 0 \<epsilon> \<Xi> 4 \<and> \<Xi> 0 \<noteq> \<langle>\<Xi> 3,\<Xi> 2\<rangle> \<and> \<Xi> 0 \<noteq> \<langle>\<Xi> 1,\<Xi> 3\<rangle>))"
-            unfolding logsimps by rule+
-          obtain g where g: "\<forall> u. u \<epsilon> g \<longleftrightarrow> (u = \<langle>pt,ft\<rangle> \<or> (u \<epsilon> f \<and> u \<noteq> \<langle>t,ft\<rangle> \<and> u \<noteq> \<langle>pt,t\<rangle>))"
-            using sep[rule_format, OF sfp, of "f \<union>\<^sub>M {\<langle>pt,ft\<rangle>}\<^sub>M" "undefined(1:=pt, 2:=ft, 3:= t ,4:=f)", simplified] by auto           
-          show False
-          proof (rule IH)
-            show "y' \<subset>\<^sub>M x"
-              using \<open>y \<subset>\<^sub>M x \<union>\<^sub>M {t}\<^sub>M\<close> \<open>t \<epsilon> y \<and> ft \<noteq> t\<close> unfolding proper_subsetM_def y'[rule_format] pow_setsuc_def' setext[of y] setext[of y'] by blast
-            show "x \<approx>\<^sub>M y'"
-            proof-  
-              have "one_oneM g"
-                by (rule one_oneI, unfold g[rule_format] ordered_pair_unique) 
-                (use one_oneD1[OF f_bij] in blast, 
-                use one_oneD2[OF f_bij] \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> in blast,
-                use one_oneD3[OF f_bij] \<open>\<langle>pt,t\<rangle> \<epsilon> f\<close> in blast) 
-              have "domM g = x"
-                unfolding setext[of "domM _"] dom_def' 
-              proof (rule, rule)
-                fix z assume "\<exists>v. \<langle>z,v\<rangle> \<epsilon> g" 
-                show "z \<epsilon> x"
-                  using \<open>\<exists>v. \<langle>z,v\<rangle> \<epsilon> g\<close> \<open>pt \<epsilon> x\<close>  one_oneD3[OF f_bij, rule_format, of t ft _] \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close> f_dom[unfolded setext[of "domM _"] pow_setsuc_def' dom_def'] unfolding ordered_pair_unique 
-                    g[rule_format] by blast
-              next
-                fix z assume " z \<epsilon> x" 
-                then show "\<exists>v. \<langle>z,v\<rangle> \<epsilon> g"
-                  unfolding g[rule_format] using mem_not_refl f_dom[unfolded setext[of "domM _"] pow_setsuc_def' dom_def'] by (cases "z = pt") (use \<open>\<not> t \<epsilon> x\<close> in auto) 
-              qed
-              have "rngM g = y'"
-                unfolding setext[of "rngM _"] rng_def'
-              proof (rule, rule)
-                fix z assume "\<exists>v. \<langle>v,z\<rangle> \<epsilon> g"
-                show "z \<epsilon> y'"
-                  using 
-                    one_oneD2[OF f_bij]
-                   \<open>\<exists>v. \<langle>v,z\<rangle> \<epsilon> g\<close> \<open>ft \<epsilon> y\<close> \<open>t \<epsilon> y \<and> ft \<noteq> t\<close>  \<open>\<langle>pt,t\<rangle> \<epsilon> f\<close> \<open>\<langle>t,ft\<rangle> \<epsilon> f\<close>
-                  unfolding f_rng[unfolded setext[of "rngM _"]  rng_def', rule_format, symmetric, of z]  y'[rule_format] ordered_pair_unique g[rule_format] by blast
-              next
-                fix z assume "z \<epsilon> y'"
-                show "\<exists>v. \<langle>v,z\<rangle> \<epsilon> g"
-                  using \<open>z \<epsilon> y'\<close>[unfolded y'[rule_format]]
-                  unfolding f_rng[unfolded setext[of "rngM _"]  rng_def', rule_format, symmetric, of z] g[rule_format] ordered_pair_unique by blast
-              qed
-              show "x \<approx>\<^sub>M y'"
-                unfolding set_equivalent_def using \<open>rngM g = y'\<close> \<open>domM g = x\<close> \<open>one_oneM g\<close>  by blast 
-            qed
-          qed
-        qed
-      qed
-    qed
-  qed
-qed (simp add: assms)
-
-lemma dedekind_finite_nat: assumes "natM x"  shows "dedekind_fin x"
-  using nat_induction_sp[OF SP_dedekind empty_dedekind \<open>natM x\<close>] dedekind_finite_suc by blast
-
-lemma nat_equiv_unique: assumes "natM x" "natM y" "x \<approx>\<^sub>M y"
-  shows "x = y"
-proof (rule ccontr)
-  assume "x \<noteq> y"
-  have "\<not> y \<epsilon> x"  
-    using \<open>x \<noteq> y\<close> assms dedekind_finite_nat[unfolded dedekind_fin_def, rule_format, OF \<open>natM x\<close>] ordM_D1[OF natM_D1[OF \<open>natM x\<close>]] subsetM_def proper_subset_def' by blast 
-  have "\<not> x \<epsilon> y"  
-    using \<open>x \<noteq> y\<close> assms dedekind_finite_nat[unfolded dedekind_fin_def, rule_format, OF \<open>natM y\<close>] ordM_D1[OF natM_D1[OF \<open>natM y\<close>]] 
-     subsetM_def proper_subset_def' set_equivalent_sym[of x y] by blast
-  show False
-    using \<open>\<not> x \<epsilon> y\<close> \<open>\<not> y \<epsilon> x\<close> \<open>x \<noteq> y\<close>  ordM_total[OF natM_D1 natM_D1, OF assms(1,2)] by blast
-qed     
-
-lemma card_inj: assumes "cardinality x n" "cardinality x m" shows "n = m"
-  using assms unfolding cardinality_def  using nat_equiv_unique set_equivalent_sym set_equivalent_trans  by blast
-
-sublocale L_setind
-proof (unfold_locales, rule, rule, rule, rule ccontr)
-  fix P \<Xi> x
-  assume "SetFormulaPredicate P" "P (\<Xi> (0:= \<emptyset>))" and step:  "\<forall>x y. P (\<Xi> (0:= x)) \<longrightarrow> P ((\<Xi> (0:=x \<union>\<^sub>M {y}\<^sub>M)))" and "\<not> (P (\<Xi> (0:=x)))"
-  have sfp: "SetFormulaPredicate (\<lambda> \<Xi>. cardinality (\<Xi> 0) (\<Xi> 1))"
-    unfolding set_defs logsimps by rule+
-  have cinj: "cardinality u v \<and> cardinality u w \<Longrightarrow> v = w" for u v w
-    using card_inj by auto
-  from sep[OF \<open>SetFormulaPredicate P\<close>, rule_format, of"\<PP> x" \<Xi>]
-  obtain s where s: "\<forall>u. (u \<epsilon> s) = (u \<epsilon> \<PP> x \<and> P (\<Xi>(0 := u)))"
-    by blast
-  from replp_vars[rule_format, OF sfp, of \<Xi> 0 1 s, simplified] 
-  obtain m where m: "\<forall>v. (v \<epsilon> m) = (\<exists>a. a \<epsilon> s \<and> cardinality a v) " 
-    using cinj by blast
-  have "\<emptyset> \<epsilon> m"
-    using card_emp exI[of "\<lambda> x. x \<subseteq>\<^sub>M c \<and> P (\<Xi> (0:=x, 1:=\<emptyset>)) \<and> cardinality x \<emptyset>" \<emptyset>] \<open>P (\<Xi> (0:=\<emptyset>))\<close> 
-    unfolding m[rule_format] powerset_def' subsetM_def s[rule_format]
-    using empty_set_def'  by auto 
-  have "n \<union>\<^sub>M {n}\<^sub>M \<epsilon> m" if "n \<epsilon> m" for n
-  proof-                  
-    obtain y where "y \<epsilon> \<PP> x" "cardinality y n" "P (\<Xi> (0:=y))"
-      using m  \<open>n \<epsilon> m\<close> s by fast
-    obtain y' where "y' \<epsilon> x" "\<not> y' \<epsilon> y" 
-      using \<open>y \<epsilon> \<PP> x\<close> \<open>P (\<Xi> (0:=y))\<close> \<open>\<not> P (\<Xi> (0:=x))\<close> subsetM_antisym powerset_def' subsetM_def by blast
-    show "n \<union>\<^sub>M {n}\<^sub>M \<epsilon> m"
-      unfolding m[rule_format] 
-    proof (rule exI[of _ "y \<union>\<^sub>M {y'}\<^sub>M"])  
-      show "y \<union>\<^sub>M {y'}\<^sub>M \<epsilon> s \<and> cardinality (y \<union>\<^sub>M {y'}\<^sub>M) (n \<union>\<^sub>M {n}\<^sub>M)"
-        using card_suc[OF \<open>\<not> y' \<epsilon> y\<close> \<open>cardinality y n\<close>] \<open>y \<epsilon> \<PP> x\<close> \<open>y' \<epsilon> x\<close>  
-          step[rule_format, OF \<open>P (\<Xi>(0:= y))\<close>] unfolding powerset_def' subsetM_def s[rule_format] by simp
-    qed 
-  qed
-  then show False
-    using fin \<open>\<emptyset> \<epsilon> m\<close> by blast
-qed
-
-lemma cardinality_ex: "\<exists>! n. natM n \<and> x \<approx>\<^sub>M n"
-proof (rule ex_ex1I)
-  show "\<exists> n. natM n \<and> x \<approx>\<^sub>M n"
-  proof (rule setind_SP[rule_format])
-    show "SetProperty (\<lambda>a. \<exists>n. natM n \<and> a \<approx>\<^sub>M n)"
-      unfolding SetProperty_def set_defs logsimps by rule+
-    show "\<exists>n. natM n \<and> \<emptyset> \<approx>\<^sub>M n"
-      using card_emp cardinality_def by blast
-    show "\<exists>n. natM n \<and> x \<union>\<^sub>M {y}\<^sub>M \<approx>\<^sub>M n" if "\<exists>n. natM n \<and> x \<approx>\<^sub>M n" for x y
-      using that card_suc triv_suc unfolding cardinality_def  by metis 
-  qed
-  show "natM n \<and> x \<approx>\<^sub>M n \<Longrightarrow> natM y \<and> x \<approx>\<^sub>M y \<Longrightarrow> n = y" for n x y
-    using nat_equiv_unique set_equivalent_sym set_equivalent_trans by blast
-qed
-
-lemma dedekind_finite: "\<forall> x. dedekind_fin x"
-  using setind_SP[rule_format, OF SP_dedekind empty_dedekind] dedekind_finite_suc by blast
-
-sublocale L_dedekind
-  using dedekind_finite by unfold_locales  
-
-sublocale L_tarski
-  by unfold_locales (use empty_tarski set_signature.SP_tarski setind_SP tarski_suc_tarski in blast)
-
-
-lemma ord_iff_nat: "ordM x \<longleftrightarrow> natM x"
-  unfolding ordM_def natM_def using tarski by blast 
-
-text \<open>The following theorem corresponds to Theorem 4.2 in Kaye-Wong\<close>
-
-lemma nat_iff_suc: "natM x \<longleftrightarrow> x = \<emptyset> \<or> (\<exists> y. natM y \<and> x = y \<union>\<^sub>M {y}\<^sub>M)"
-proof 
-  show "x = \<emptyset> \<or> (\<exists>y. natM y \<and> x = y \<union>\<^sub>M {y}\<^sub>M) \<Longrightarrow> natM x"
-    using emp_natM nat_suc_nat by blast
-next
-  fix x assume "natM x"
-  have "SetProperty (\<lambda>a. a = \<emptyset> \<or> (\<exists>y. natM y \<and> a = y \<union>\<^sub>M {y}\<^sub>M))"
-    unfolding SetProperty_def set_defs logsimps setext by rule+ 
-  show "x = \<emptyset> \<or> (\<exists>y. natM y \<and> x = y \<union>\<^sub>M {y}\<^sub>M)"
-    by (rule nat_induction_sp, fact, simp, fact, blast) 
-qed
-
-end
-
-subsection \<open>Dedekind finite\<close>
-
-locale L_setext_empty_power_union_repl_dedekind = L_setext + L_dedekind + L_empty + L_power + L_union + L_repl
-
-begin
-
-sublocale L_setext_empty_repl
-  by unfold_locales
-
-sublocale L_setext_empty_power_union_repl
-  by unfold_locales  
-
-lemma neg_inf: "\<nexists> x. \<emptyset> \<epsilon> x \<and> (\<forall>y. y \<epsilon> x \<longrightarrow> y \<union>\<^sub>M {y}\<^sub>M \<epsilon> x)"
-proof
-  assume "\<exists>x. \<emptyset> \<epsilon> x \<and> (\<forall>y. y \<epsilon> x \<longrightarrow> y \<union>\<^sub>M {y}\<^sub>M \<epsilon> x)"
-  then obtain x' where x': "\<emptyset> \<epsilon> x'" "\<forall>y. y \<epsilon> x' \<longrightarrow> y \<union>\<^sub>M {y}\<^sub>M \<epsilon> x'"
-    by blast
-  define x where "x = separationM x' natM"
-  from separ_def_sp[OF SP_nat]
-  have x: "u \<epsilon> x \<longleftrightarrow> u \<epsilon> x' \<and> natM u" for u
-    unfolding x_def. 
-  have x_suc: "u \<epsilon> x \<longrightarrow> u \<union>\<^sub>M {u}\<^sub>M \<epsilon> x" for u
-    using x'(2) nat_suc_nat[of u] unfolding x by blast 
-  have "SetFormulaPredicate (\<lambda> \<Xi>. \<exists> v. \<Xi> 0 = \<langle>v,v \<union>\<^sub>M {v}\<^sub>M\<rangle>)"
-    unfolding logsimps set_defs by rule+ 
-  from sep[OF this, rule_format, of "x \<times>\<^sub>M x", simplified]
-  obtain f where "u \<epsilon> f \<longleftrightarrow> (u \<epsilon> x \<times>\<^sub>M x  \<and> (\<exists>v. u = \<langle>v,v \<union>\<^sub>M {v}\<^sub>M\<rangle>))" for u
-    by blast
-  hence f: "u \<epsilon> f \<longleftrightarrow> (\<exists> v. v \<epsilon> x \<and> u = \<langle>v,v \<union>\<^sub>M {v}\<^sub>M\<rangle>)" for u
-    using car_prod_def' x_suc by auto
-  have "one_oneM f"
-    by (rule one_oneI, unfold f x, blast, unfold ordered_pair_unique)  
-      (use ord_pred_inj[OF natM_D1 natM_D1] in blast)+
-  have "domM f = x"
-    unfolding setext[of _ x] f dom_def' by force 
-  have "x \<approx>\<^sub>M rngM f"
-    unfolding set_equivalent_def by (rule exI[of _ f]) (use \<open>one_oneM f\<close> \<open>domM f = x\<close> in blast)
-  have "rngM f \<subset>\<^sub>M x"
-  proof (rule proper_subsetI)
-    show "rngM f \<subseteq>\<^sub>M x"
-      unfolding subsetM_def rng_def' f ordered_pair_unique using x_suc by blast
-    show "rngM f \<noteq> x"
-      unfolding setext[of _ x] rng_def' not_all
-    proof (rule exI[of _ \<emptyset>])
-      have t: "\<emptyset> \<epsilon> x = True"
-        by (simp add: x x'(1))
-      have f: "(\<exists> v. \<langle>v,\<emptyset>\<rangle> \<epsilon> f) = False"
-        unfolding f ordered_pair_unique setext[of \<emptyset>] binunion_def' singleton_def' by force
-      show "(\<exists>v. \<langle>v,\<emptyset>\<rangle> \<epsilon> f) \<noteq> (\<emptyset> \<epsilon> x)"
-        unfolding t f by blast
-    qed
-  qed
-  from dedekind[unfolded dedekind_fin_def, rule_format, OF this] 
-  show False
-    using \<open>x \<approx>\<^sub>M rngM f\<close> by blast
-qed
-
-sublocale L_fin
-  using neg_inf by unfold_locales
-
-end
-
 subsection \<open>Successor induction\<close> 
 text \<open>See P. Vopěnka, Mathematics in the alternative set theory. Teubner 1979\<close>
 
@@ -2551,132 +2298,7 @@ sublocale L_tarski
   by unfold_locales (simp add: tarski_fin_def, metis empty)  
 
 sublocale L_dedekind
-proof (unfold_locales, unfold dedekind_fin_def, rule)
-  fix x
-  let ?Q = "\<lambda> x. \<not> (\<exists> u. u \<subset>\<^sub>M x \<and> u \<approx>\<^sub>M x)"
-  have sp: "SetProperty ?Q"
-    unfolding SetProperty_def logsimps set_defs by rule+
-  have "\<nexists>u. u \<subset>\<^sub>M x \<and> u \<approx>\<^sub>M x" \<comment>\<open>by induction on \<open>?Q\<close>\<close>
-  proof(rule setind_SP[OF sp], use empty_is_empty proper_subset_diff in blast, rule, rule, rule, rule)
-    fix x y
-    assume "\<nexists>u. u \<subset>\<^sub>M x \<and> u \<approx>\<^sub>M x" and contr: "\<exists>u. u \<subset>\<^sub>M x \<union>\<^sub>M {y}\<^sub>M \<and> u \<approx>\<^sub>M x \<union>\<^sub>M {y}\<^sub>M"
-    then have "\<not> y \<epsilon> x"
-      by force
-    from contr 
-    obtain u f where u: "u \<subset>\<^sub>M x \<union>\<^sub>M {y}\<^sub>M" and f: "one_oneM f" "x \<union>\<^sub>M {y}\<^sub>M = domM f" "u = rngM f"  
-      unfolding set_equivalent_sym[of _ "_ \<union>\<^sub>M _"] unfolding set_equivalent_def  by blast
-    obtain fy where "\<langle>y,fy\<rangle> \<epsilon> f" and "fy \<epsilon> u"
-      using f by (metis dom_def' rng_def' setsuc_def')
-    show False
-    proof (cases "u \<subseteq>\<^sub>M x")
-      assume "u \<subseteq>\<^sub>M x"
-      let ?u' = "separationM u (\<lambda> v. v \<noteq> fy)"
-      have u': "z \<epsilon> ?u' \<longleftrightarrow> z \<epsilon> u \<and> z \<noteq> fy" for z
-        using separ_def_sfp[of "\<lambda> \<Xi>. \<Xi> 0 \<noteq> \<Xi> 1" z u "undefined(1:=fy)" 0, simplified].
-      hence "?u' \<subset>\<^sub>M x"
-        using u' \<open>u \<subseteq>\<^sub>M x\<close> \<open>fy \<epsilon> u\<close> unfolding proper_subsetM_def subsetM_def by blast
-      let ?f' = "separationM f (\<lambda> v. v \<noteq> \<langle>y,fy\<rangle>)"
-      have f': "a \<epsilon> ?f' \<longleftrightarrow> a \<epsilon> f \<and> a \<noteq> \<langle>y,fy\<rangle>" for a
-        using separ_def_sfp[of "\<lambda> \<Xi>. \<Xi> 0 \<noteq> \<Xi> 1" a f "undefined(1:= \<langle>y,fy\<rangle>)" 0, simplified].
-      have "one_oneM ?f'"
-        by (rule one_oneI, unfold f',
-            use one_oneD1[OF \<open>one_oneM f\<close>] in blast,
-            use one_oneD2[OF \<open>one_oneM f\<close>] in blast,
-            use one_oneD3[OF \<open>one_oneM f\<close>] in blast)
-      have "x = domM ?f'"
-        using f(2) \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close> one_oneD3[OF f(1)] \<open>\<not> y \<epsilon> x\<close> unfolding setext[of _ "domM _"] u' dom_def' f' setsuc_def'
-        by auto        
-      have "?u' = rngM ?f'"
-        using f(3) \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close> one_one_inj[OF f(1)] unfolding setext[of _ "rngM _"] u' rng_def' f' 
-        by auto  
-      have "?u' \<approx>\<^sub>M x"
-        unfolding set_equivalent_sym[of _ x] unfolding set_equivalent_def   
-        by (rule exI[of _ ?f'] , simp add: \<open>one_oneM ?f'\<close> \<open>?u' = rngM ?f'\<close> \<open>x = domM ?f'\<close>)  
-      thus False
-        using \<open>\<nexists>u. u \<subset>\<^sub>M x \<and> u \<approx>\<^sub>M x\<close> \<open>?u' \<subset>\<^sub>M x\<close> by blast 
-    next 
-      assume "\<not> u \<subseteq>\<^sub>M x"  
-      hence "y \<epsilon> u"
-        using u(1)[unfolded proper_subset_def'] using setsuc_def' suc_subset_setind  by metis
-      then obtain z where "\<langle>z,y\<rangle> \<epsilon> f"
-        using f(3) rng_def' by blast
-      show False
-      proof (cases "z = y")
-        assume "z = y"
-        have "z = fy"
-          using \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close> \<open>\<langle>z,y\<rangle> \<epsilon> f\<close> \<open>z = y\<close> f(1) one_oneD3 by auto
-        let ?u' = "separationM u (\<lambda> v. v \<noteq> fy)"
-        have u': "z \<epsilon> ?u' \<longleftrightarrow> z \<epsilon> u \<and> z \<noteq> fy" for z
-          using separ_def_sfp[of "\<lambda> \<Xi>. \<Xi> 0 \<noteq> \<Xi> 1" z u "undefined(1:=fy)" 0, simplified].
-        have "?u' \<subset>\<^sub>M x"
-          using u \<open>z = y\<close> \<open>z = fy\<close> \<open>fy \<epsilon> u\<close> unfolding setext[of u] setext[of _ x]  proper_subsetM_def u' setsuc_def' 
-          by auto
-        let ?f' = "separationM f (\<lambda> v. v \<noteq> \<langle>y,y\<rangle>)"
-        have f': "a \<epsilon> ?f' \<longleftrightarrow> a \<epsilon> f \<and> a \<noteq> \<langle>y,y\<rangle>" for a
-          using separ_def_sfp[of "\<lambda> \<Xi>. \<Xi> 0 \<noteq> \<Xi> 1" a f "undefined(1:= \<langle>y,y\<rangle>)" 0, simplified].
-        have "one_oneM ?f'"
-          by (rule one_oneI, unfold f',
-              use one_oneD1[OF \<open>one_oneM f\<close>] in blast,
-              use one_oneD2[OF \<open>one_oneM f\<close>] in blast,
-              use one_oneD3[OF \<open>one_oneM f\<close>] in blast)
-        have "x = domM ?f'"
-          using f(2) \<open>\<langle>z,y\<rangle> \<epsilon> f\<close>[unfolded \<open>z = y\<close>] one_oneD3[OF f(1)] \<open>\<not> y \<epsilon> x\<close> 
-          unfolding setext[of _ "domM _"] dom_def' f' setsuc_def' by auto
-        have "?u' = rngM ?f'"
-          using f(3) \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close> \<open>z = fy\<close> \<open>z = y\<close>  one_one_inj[OF f(1)] unfolding setext[of _ "rngM _"] u' rng_def' f'
-          by auto 
-        have "?u' \<approx>\<^sub>M x"
-          unfolding set_equivalent_sym[of _ x] unfolding set_equivalent_def   
-          by (rule exI[of _ ?f'] , simp add: \<open>one_oneM ?f'\<close> \<open>?u' = rngM ?f'\<close> \<open>x = domM ?f'\<close>)  
-        thus False
-          using \<open>\<nexists>u. u \<subset>\<^sub>M x \<and> u \<approx>\<^sub>M x\<close> \<open>?u' \<subset>\<^sub>M x\<close> by blast 
-      next
-        assume "z \<noteq> y"
-        let ?u' = "x \<inter>\<^sub>M u"
-        have "?u' \<subset>\<^sub>M x" 
-          using \<open>y \<epsilon> u\<close> \<open>\<not> y \<epsilon> x\<close> \<open>u \<subset>\<^sub>M x \<union>\<^sub>M {y}\<^sub>M\<close> 
-          unfolding setsuc_def' proper_subsetM_def intersection_def'  setext[of u] setext[of _ x] by blast 
-        let ?Q = "\<lambda> v. v \<epsilon> f \<and> v \<noteq> \<langle>z,y\<rangle> \<and> v \<noteq> \<langle>y,fy\<rangle> \<or> v = \<langle>z,fy\<rangle>"
-        have sfp: "SetFormulaPredicate (\<lambda>\<Xi>. \<Xi> 0 \<noteq> \<Xi> 1 \<and> \<Xi> 0 \<noteq> \<Xi> 2)"
-          unfolding logsimps by rule+
-        let ?g' =  "collectM ?Q"
-        have g': "a \<epsilon> ?g' \<longleftrightarrow> ?Q a" for a
-          using collect_def'[of "separationM f (\<lambda>x. x \<noteq> \<langle>z,y\<rangle> \<and> x \<noteq> \<langle>y,fy\<rangle>) \<union>\<^sub>M {\<langle>z,fy\<rangle>}\<^sub>M" ?Q, unfolded setext[of "collectM _ "], rule_format, of a]
-          unfolding setsuc_def' separ_def_sfp[of "\<lambda> \<Xi>. \<Xi> 0 \<noteq> \<Xi> 1 \<and> \<Xi> 0 \<noteq> \<Xi> 2" _ f "undefined(1:= \<langle>z,y\<rangle>,2:= \<langle>y,fy\<rangle>)" 0, OF sfp, simplified] by fast 
-        have "one_oneM ?g'"
-          by (rule one_oneI, unfold g', 
-              use one_oneD1[OF f(1)] in blast,
-              use one_oneD3[OF \<open>one_oneM f\<close>] \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close>
-              one_one_inj[OF f(1)] ordered_pair_unique in metis,
-              use one_oneD3[OF \<open>one_oneM f\<close>] \<open>\<langle>z,y\<rangle> \<epsilon> f\<close> in fastforce)
-        have "?u' = rngM ?g'"
-          unfolding setext[of _ "rngM _"] rng_def' g' intersection_def'
-        proof(rule, rule)
-          fix t assume "t \<epsilon> x \<and> t \<epsilon> u"
-          then show "\<exists>v. \<langle>v,t\<rangle> \<epsilon> f \<and> \<langle>v,t\<rangle> \<noteq> \<langle>z,y\<rangle> \<and> \<langle>v,t\<rangle> \<noteq> \<langle>y,fy\<rangle> \<or> \<langle>v,t\<rangle> = \<langle>z,fy\<rangle>"
-            using \<open>\<not> y \<epsilon> x\<close> f(3) rng_def' by auto
-        next
-          fix t assume a: "\<exists>v. \<langle>v,t\<rangle> \<epsilon> f \<and> \<langle>v,t\<rangle> \<noteq> \<langle>z,y\<rangle> \<and> \<langle>v,t\<rangle> \<noteq> \<langle>y,fy\<rangle> \<or> \<langle>v,t\<rangle> = \<langle>z,fy\<rangle>"
-          then show "t \<epsilon> x \<and> t \<epsilon> u"
-            by (metis \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close> \<open>\<langle>z,y\<rangle> \<epsilon> f\<close> \<open>z \<noteq> y\<close> f(1,3) one_one_inj[of f z t]
-                ordered_pair_unique[of _ t z fy] proper_subsetM_def[of u "x \<union>\<^sub>M {y}\<^sub>M"] rng_def'[of t f]
-                setsuc_def'[of t x y] u)
-        qed
-        have "x = domM ?g'"
-          using f(2) \<open>\<langle>y,fy\<rangle> \<epsilon> f\<close> one_oneD2[OF f(1)] \<open>\<not> y \<epsilon> x\<close> unfolding setext[of _ "domM _"] dom_def' g' setsuc_def'
-            intersection_def'
-          by (metis \<open>\<langle>z,y\<rangle> \<epsilon> f\<close> \<open>z \<noteq> y\<close> f(1) one_oneD3 ordered_pair_unique) 
-        have "?u' \<approx>\<^sub>M x"
-          unfolding set_equivalent_sym[of _ x] unfolding set_equivalent_def   
-          by(rule exI[of _ ?g'], use \<open>one_oneM ?g'\<close> \<open>x = domM ?g'\<close> \<open>x \<inter>\<^sub>M u = rngM ?g'\<close> in blast)
-        thus False
-          using \<open>\<nexists>u. u \<subset>\<^sub>M x \<and> u \<approx>\<^sub>M x\<close> \<open>?u' \<subset>\<^sub>M x\<close> by blast 
-      qed
-    qed
-  qed
-  then show "\<forall>y. y \<subset>\<^sub>M x \<longrightarrow> \<not> x \<approx>\<^sub>M y"
-    using set_equivalent_sym by blast
-qed
+  by unfold_locales (use setind_SP[rule_format, OF SP_dedekind empty_dedekind] dedekind_finite_suc in blast) 
     
 text \<open>Corresponds to Corollary 4.3 in Kaye-Wong\<close>
 
@@ -2757,8 +2379,251 @@ qed
 
 end
 
-sublocale L_setext_empty_power_union_repl_reg_fin \<subseteq> L_setext_empty_setsuc_setind
+subsection \<open>Negation of inf\<close>
+
+locale L_setext_empty_power_union_repl_fin  = L_setext + L_empty + L_power + L_union + L_repl +  L_fin
+
+begin
+
+sublocale L_setext_empty_repl
+     by unfold_locales
+
+sublocale L_setext_empty
   by unfold_locales
+
+sublocale L_setext_empty_power_union_repl
+  by unfold_locales
+
+lemma nat_induction_sfp: assumes "SetFormulaPredicate P" and  "P (\<Xi>(0:=\<emptyset>))" and "natM x" and
+  step: "\<And> x. natM x \<Longrightarrow> P (\<Xi>(0:=x)) \<Longrightarrow> P (\<Xi>(0:=x \<union>\<^sub>M {x}\<^sub>M))"
+  shows "P (\<Xi>(0:=x))"
+proof (rule ccontr)
+  assume "\<not> P (\<Xi>(0:=x))"
+  define v where "v = separationM x (\<lambda> x. P(\<Xi>(0:=x)))"
+  from separ_def_sfp[OF \<open>SetFormulaPredicate P\<close>]
+  have v: "u \<epsilon> v \<longleftrightarrow> u \<epsilon> x \<and> P(\<Xi>(0:=u))" for u
+    unfolding v_def by simp 
+  hence "\<emptyset> \<epsilon> v"
+    using \<open>P (\<Xi>(0:=\<emptyset>))\<close> \<open>\<not> P (\<Xi>(0:=x))\<close> \<open>natM x\<close> emp_natM empty_is_empty ordM_total unfolding natM_def by blast
+  have "(y \<union>\<^sub>M {y}\<^sub>M) \<epsilon> v" if "y \<epsilon> v" for y
+   unfolding v[of "y \<union>\<^sub>M {y}\<^sub>M"] using \<open>\<not> P (\<Xi>(0:=x))\<close> \<open>natM x\<close> that[unfolded v[of y]] step[of y] ord_mem_suc[of x y] mem_nat_nat[of y x] natM_D1[OF \<open>natM x\<close>] by fast
+  thus False
+    using \<open>\<emptyset> \<epsilon> v\<close> fin by auto
+qed
+
+lemma nat_induction_sp: assumes "SetProperty P" and  "P \<emptyset>" and "natM x" and
+  step: "\<And> x. natM x \<Longrightarrow> P x \<Longrightarrow> P (x \<union>\<^sub>M {x}\<^sub>M)"
+shows "P x"
+  using assms unfolding SetProperty_def using nat_induction_sfp by force  
+
+end
+
+locale L_setext_empty_power_union_repl_reg_fin  = L_setext + L_empty + L_power + L_union + L_repl + L_reg + L_fin
+
+begin
+
+sublocale L_setext_empty_power_union_repl_fin
+  by unfold_locales
+
+sublocale L_setext_empty_power_union_repl_reg
+  by unfold_locales
+
+
+lemma SR_card: "SetRelation cardinality"
+  unfolding set_defs logsimps SetRelation_def by rule+
+
+lemma card_suc: assumes "\<not> y \<epsilon> x" "cardinality x m" shows "cardinality (x \<union>\<^sub>M {y}\<^sub>M)  (m \<union>\<^sub>M {m}\<^sub>M)"
+proof-
+  obtain f where "one_oneM f" "x = domM f" "m = rngM f" "natM m"
+    using \<open>cardinality x m\<close> unfolding cardinality_def set_equivalent_def by blast
+  let ?f = "f \<union>\<^sub>M {\<langle>y,m\<rangle>}\<^sub>M"
+  have "natM (m \<union>\<^sub>M {m}\<^sub>M)"
+    by (simp add: \<open>natM m\<close> nat_suc_nat)
+  have "x \<union>\<^sub>M {y}\<^sub>M = domM ?f"
+    using \<open>x = domM f\<close> unfolding setext dom_def' by auto
+  have "m \<union>\<^sub>M {m}\<^sub>M = rngM ?f"
+    using \<open>m = rngM f\<close> unfolding setext rng_def' by auto
+  have "relationM ?f"
+    unfolding relationM_def
+    using \<open>one_oneM f\<close> functionM_def one_oneM_def relationM_def by auto 
+  then have "functionM ?f"
+    unfolding functionM_def
+    using \<open>one_oneM f\<close> \<open>x = domM f\<close> \<open>\<not> y \<epsilon> x\<close> dom_def' funD one_oneD3 by auto 
+  then have "one_oneM ?f"
+    unfolding one_oneM_def 
+    using   \<open>\<not> y \<epsilon> x\<close> one_one_inj[OF \<open>one_oneM f\<close>] \<open>m = rngM f\<close> mem_not_refl[of m] 
+    rng_def'  by auto 
+  show ?thesis
+    unfolding cardinality_def set_equivalent_def 
+    using \<open>m \<union>\<^sub>M {m}\<^sub>M = rngM ?f\<close> \<open>natM (m \<union>\<^sub>M {m}\<^sub>M)\<close> \<open>one_oneM ?f\<close> \<open>x \<union>\<^sub>M {y}\<^sub>M = domM ?f\<close> by blast
+qed                                    
+
+lemma card_emp: "cardinality \<emptyset> \<emptyset>" 
+proof-
+  have "natM \<emptyset>"
+    by simp
+  moreover have "one_oneM \<emptyset>" 
+    unfolding one_oneM_def functionM_def relationM_def by simp
+  moreover have "\<emptyset> = domM \<emptyset>" "\<emptyset> = rngM \<emptyset>"                          
+    unfolding setext dom_def' rng_def' by simp_all 
+  ultimately show ?thesis
+    unfolding cardinality_def set_equivalent_def 
+    using exI[of "\<lambda> f.  one_oneM f \<and> \<emptyset> = domM f \<and> \<emptyset> = rngM f" \<emptyset>] by blast
+qed
+
+lemma dedekind_finite_nat: assumes "natM x"  shows "dedekind_fin x"
+  using nat_induction_sp[OF SP_dedekind empty_dedekind \<open>natM x\<close>] dedekind_finite_suc by blast
+
+lemma nat_equiv_unique: assumes "natM x" "natM y" "x \<approx>\<^sub>M y"
+  shows "x = y"
+proof (rule ccontr)
+  assume "x \<noteq> y"
+  have "\<not> y \<epsilon> x"  
+    using \<open>x \<noteq> y\<close> assms dedekind_finite_nat[unfolded dedekind_fin_def, rule_format, OF \<open>natM x\<close>] ordM_D1[OF natM_D1[OF \<open>natM x\<close>]] subsetM_def proper_subset_def' by blast 
+  have "\<not> x \<epsilon> y"  
+    using \<open>x \<noteq> y\<close> assms dedekind_finite_nat[unfolded dedekind_fin_def, rule_format, OF \<open>natM y\<close>] ordM_D1[OF natM_D1[OF \<open>natM y\<close>]] 
+     subsetM_def proper_subset_def' set_equivalent_sym[of x y] by blast
+  show False
+    using \<open>\<not> x \<epsilon> y\<close> \<open>\<not> y \<epsilon> x\<close> \<open>x \<noteq> y\<close>  ordM_total[OF natM_D1 natM_D1, OF assms(1,2)] by blast
+qed     
+
+lemma card_fun: assumes "cardinality x n" "cardinality x m" shows "n = m"
+  using assms unfolding cardinality_def  using nat_equiv_unique set_equivalent_sym set_equivalent_trans  by blast
+
+sublocale L_setind
+proof (unfold_locales, rule, rule, rule, rule ccontr)
+  fix P \<Xi> x
+  assume "SetFormulaPredicate P" "P (\<Xi> (0:= \<emptyset>))" and step:  "\<forall>x y. P (\<Xi> (0:= x)) \<longrightarrow> P ((\<Xi> (0:=x \<union>\<^sub>M {y}\<^sub>M)))" and "\<not> (P (\<Xi> (0:=x)))"
+  have sfp: "SetFormulaPredicate (\<lambda> \<Xi>. cardinality (\<Xi> 0) (\<Xi> 1))"
+    unfolding set_defs logsimps by rule+
+  have cinj: "cardinality u v \<and> cardinality u w \<Longrightarrow> v = w" for u v w
+    using card_fun by auto
+  from sep[OF \<open>SetFormulaPredicate P\<close>, rule_format, of"\<PP> x" \<Xi>]
+  obtain s where s: "\<forall>u. (u \<epsilon> s) = (u \<epsilon> \<PP> x \<and> P (\<Xi>(0 := u)))"
+    by blast
+  from replp_vars[rule_format, OF sfp, of \<Xi> 0 1 s, simplified] 
+  obtain m where m: "\<forall>v. (v \<epsilon> m) = (\<exists>a. a \<epsilon> s \<and> cardinality a v) " 
+    using cinj by blast
+  have "\<emptyset> \<epsilon> m"
+    using card_emp exI[of "\<lambda> x. x \<subseteq>\<^sub>M c \<and> P (\<Xi> (0:=x, 1:=\<emptyset>)) \<and> cardinality x \<emptyset>" \<emptyset>] \<open>P (\<Xi> (0:=\<emptyset>))\<close> 
+    unfolding m[rule_format] powerset_def' subsetM_def s[rule_format]
+    using empty_set_def'  by auto 
+  have "n \<union>\<^sub>M {n}\<^sub>M \<epsilon> m" if "n \<epsilon> m" for n
+  proof-                  
+    obtain y where "y \<epsilon> \<PP> x" "cardinality y n" "P (\<Xi> (0:=y))"
+      using m  \<open>n \<epsilon> m\<close> s by fast
+    obtain y' where "y' \<epsilon> x" "\<not> y' \<epsilon> y" 
+      using \<open>y \<epsilon> \<PP> x\<close> \<open>P (\<Xi> (0:=y))\<close> \<open>\<not> P (\<Xi> (0:=x))\<close> subsetM_antisym powerset_def' subsetM_def by blast
+    show "n \<union>\<^sub>M {n}\<^sub>M \<epsilon> m"
+      unfolding m[rule_format] 
+    proof (rule exI[of _ "y \<union>\<^sub>M {y'}\<^sub>M"])  
+      show "y \<union>\<^sub>M {y'}\<^sub>M \<epsilon> s \<and> cardinality (y \<union>\<^sub>M {y'}\<^sub>M) (n \<union>\<^sub>M {n}\<^sub>M)"
+        using card_suc[OF \<open>\<not> y' \<epsilon> y\<close> \<open>cardinality y n\<close>] \<open>y \<epsilon> \<PP> x\<close> \<open>y' \<epsilon> x\<close>  
+          step[rule_format, OF \<open>P (\<Xi>(0:= y))\<close>] unfolding powerset_def' subsetM_def s[rule_format] by simp
+    qed 
+  qed
+  then show False
+    using fin \<open>\<emptyset> \<epsilon> m\<close> by blast
+qed
+
+lemma cardinality_ex: "\<exists>! n. natM n \<and> x \<approx>\<^sub>M n"
+proof (rule ex_ex1I)
+  show "\<exists> n. natM n \<and> x \<approx>\<^sub>M n"
+  proof (rule setind_SP[rule_format])
+    show "SetProperty (\<lambda>a. \<exists>n. natM n \<and> a \<approx>\<^sub>M n)"
+      unfolding SetProperty_def set_defs logsimps by rule+
+    show "\<exists>n. natM n \<and> \<emptyset> \<approx>\<^sub>M n"
+      using card_emp cardinality_def by blast
+    show "\<exists>n. natM n \<and> x \<union>\<^sub>M {y}\<^sub>M \<approx>\<^sub>M n" if "\<exists>n. natM n \<and> x \<approx>\<^sub>M n" for x y
+      using that card_suc triv_suc unfolding cardinality_def  by metis 
+  qed
+  show "natM n \<and> x \<approx>\<^sub>M n \<Longrightarrow> natM y \<and> x \<approx>\<^sub>M y \<Longrightarrow> n = y" for n x y
+    using nat_equiv_unique set_equivalent_sym set_equivalent_trans by blast
+qed
+
+sublocale L_setext_empty_setsuc_setind
+  by unfold_locales
+
+lemma ord_iff_nat: "ordM x \<longleftrightarrow> natM x"
+  unfolding ordM_def natM_def using tarski by blast 
+
+text \<open>The following theorem corresponds to Theorem 4.2 in Kaye-Wong\<close>
+
+lemma nat_iff_suc: "natM x \<longleftrightarrow> x = \<emptyset> \<or> (\<exists> y. natM y \<and> x = y \<union>\<^sub>M {y}\<^sub>M)"
+proof 
+  show "x = \<emptyset> \<or> (\<exists>y. natM y \<and> x = y \<union>\<^sub>M {y}\<^sub>M) \<Longrightarrow> natM x"
+    using emp_natM nat_suc_nat by blast
+next
+  fix x assume "natM x"
+  have "SetProperty (\<lambda>a. a = \<emptyset> \<or> (\<exists>y. natM y \<and> a = y \<union>\<^sub>M {y}\<^sub>M))"
+    unfolding SetProperty_def set_defs logsimps setext by rule+ 
+  show "x = \<emptyset> \<or> (\<exists>y. natM y \<and> x = y \<union>\<^sub>M {y}\<^sub>M)"
+    by (rule nat_induction_sp, fact, simp, fact, blast) 
+qed
+
+end
+
+subsection \<open>Dedekind finite\<close>
+
+locale L_setext_empty_power_union_repl_dedekind = L_setext + L_dedekind + L_empty + L_power + L_union + L_repl
+
+begin
+
+sublocale L_setext_empty_repl
+  by unfold_locales
+
+sublocale L_setext_empty_power_union_repl
+  by unfold_locales  
+
+lemma neg_inf: "\<nexists> x. \<emptyset> \<epsilon> x \<and> (\<forall>y. y \<epsilon> x \<longrightarrow> y \<union>\<^sub>M {y}\<^sub>M \<epsilon> x)"
+proof
+  assume "\<exists>x. \<emptyset> \<epsilon> x \<and> (\<forall>y. y \<epsilon> x \<longrightarrow> y \<union>\<^sub>M {y}\<^sub>M \<epsilon> x)"
+  then obtain x' where x': "\<emptyset> \<epsilon> x'" "\<forall>y. y \<epsilon> x' \<longrightarrow> y \<union>\<^sub>M {y}\<^sub>M \<epsilon> x'"
+    by blast
+  define x where "x = separationM x' natM"
+  from separ_def_sp[OF SP_nat]
+  have x: "u \<epsilon> x \<longleftrightarrow> u \<epsilon> x' \<and> natM u" for u
+    unfolding x_def. 
+  have x_suc: "u \<epsilon> x \<longrightarrow> u \<union>\<^sub>M {u}\<^sub>M \<epsilon> x" for u
+    using x'(2) nat_suc_nat[of u] unfolding x by blast 
+  have "SetFormulaPredicate (\<lambda> \<Xi>. \<exists> v. \<Xi> 0 = \<langle>v,v \<union>\<^sub>M {v}\<^sub>M\<rangle>)"
+    unfolding logsimps set_defs by rule+ 
+  from sep[OF this, rule_format, of "x \<times>\<^sub>M x", simplified]
+  obtain f where "u \<epsilon> f \<longleftrightarrow> (u \<epsilon> x \<times>\<^sub>M x  \<and> (\<exists>v. u = \<langle>v,v \<union>\<^sub>M {v}\<^sub>M\<rangle>))" for u
+    by blast
+  hence f: "u \<epsilon> f \<longleftrightarrow> (\<exists> v. v \<epsilon> x \<and> u = \<langle>v,v \<union>\<^sub>M {v}\<^sub>M\<rangle>)" for u
+    using car_prod_def' x_suc by auto
+  have "one_oneM f"
+    by (rule one_oneI, unfold f x, blast, unfold ordered_pair_unique)  
+      (use ord_pred_inj[OF natM_D1 natM_D1] in blast)+
+  have "domM f = x"
+    unfolding setext[of _ x] f dom_def' by force 
+  have "x \<approx>\<^sub>M rngM f"
+    unfolding set_equivalent_def by (rule exI[of _ f]) (use \<open>one_oneM f\<close> \<open>domM f = x\<close> in blast)
+  have "rngM f \<subset>\<^sub>M x"
+  proof (rule proper_subsetI)
+    show "rngM f \<subseteq>\<^sub>M x"
+      unfolding subsetM_def rng_def' f ordered_pair_unique using x_suc by blast
+    show "rngM f \<noteq> x"
+      unfolding setext[of _ x] rng_def' not_all
+    proof (rule exI[of _ \<emptyset>])
+      have t: "\<emptyset> \<epsilon> x = True"
+        by (simp add: x x'(1))
+      have f: "(\<exists> v. \<langle>v,\<emptyset>\<rangle> \<epsilon> f) = False"
+        unfolding f ordered_pair_unique setext[of \<emptyset>] binunion_def' singleton_def' by force
+      show "(\<exists>v. \<langle>v,\<emptyset>\<rangle> \<epsilon> f) \<noteq> (\<emptyset> \<epsilon> x)"
+        unfolding t f by blast
+    qed
+  qed
+  from dedekind[unfolded dedekind_fin_def, rule_format, OF this] 
+  show False
+    using \<open>x \<approx>\<^sub>M rngM f\<close> by blast
+qed
+
+sublocale L_fin
+  using neg_inf by unfold_locales
+
+end
   
 text \<open>A metamathematical version of "A4 (induction and regularity)", Pudlák and Sochor 1984, p.572\<close>
 locale L_setindregsch = set_signature +
@@ -3104,18 +2969,15 @@ qed
 
 theorem (in L_setext_empty_setsuc) 
   shows setind_implies_tarski: "L_setind (\<epsilon>) \<Longrightarrow> L_tarski (\<epsilon>)" and
-        setind_implies_fin_by_setsuc: "L_setind (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)"  
+        setind_implies_fin_by_setsuc: "L_setind (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)" and 
+      setind_implies_dedekind_by_setsuc: "L_setind (\<epsilon>) \<Longrightarrow> L_dedekind (\<epsilon>)"  
 proof-
   assume "L_setind (\<epsilon>)"
   then interpret L_setind
     by blast
   interpret L_setext_empty_setsuc_setind
     by unfold_locales 
-  interpret L_tarski
-    by unfold_locales 
-  interpret L_tarski
-    by unfold_locales 
-  show "L_tarski (\<epsilon>)" "L_fin (\<epsilon>)"
+  show "L_tarski (\<epsilon>)" "L_fin (\<epsilon>)" "L_dedekind (\<epsilon>)"
     by unfold_locales
 qed    
 
@@ -3140,6 +3002,8 @@ proof-
   assume "L_fin (\<epsilon>)"
   then interpret L_fin "(\<epsilon>)". 
   interpret L_setext_empty_power_union_repl_reg_fin "(\<epsilon>)"
+     by unfold_locales 
+  interpret L_setext_empty_setsuc_setind "(\<epsilon>)"
      by unfold_locales 
   show "L_tarski (\<epsilon>)" 
     by unfold_locales 
@@ -3202,9 +3066,5 @@ theorem (in L_setext_sep_reg_ts) SochorA:
 theorem (in L_setext_empty_union_repl_pair_regsch) SochorB:
  "L_ts (\<epsilon>)"
   by unfold_locales
-
-theorem (in L_setext_empty_setsuc_setind) AST_dedekind:
-  "L_dedekind (\<epsilon>)"
-  by unfold_locales 
 
 end
