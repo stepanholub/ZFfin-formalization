@@ -1,6 +1,6 @@
 theory ZFfin_HF
 
-imports Main HereditarilyFinite.Rank ZFFin
+imports Main HereditarilyFinite.Rank ZFfin
 
 begin
 
