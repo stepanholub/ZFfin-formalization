@@ -37,10 +37,10 @@ For an Isabelle beginner:
 - does not satisfy transitive superset axiom (not all sets have a transitive superset),
 - therefore in particular does not satisfy the axiom schema of regularity. 
  
- The permutation in question is $n \leftrightarrow \{n+1\}$, $n \in \omega$.
+ The permutation in question is $n \leftrightarrow \\{n+1\\}$, $n \in \omega$.
 
  **Not_regular_model.thy** employs the Bernays-Rieger method and formalizes construction of a model that 
 - satisfies axioms of extensionality, empty set, powerset, union, replacement, set induction and transitive superset,
 - does not satisfy regularity.
 
- The permutation in question is $\emptyset \leftrightarrow \{\emptyset\}$.
+ The permutation in question is $\emptyset \leftrightarrow \\{\emptyset\\}$.
