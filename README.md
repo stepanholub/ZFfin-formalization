@@ -28,7 +28,7 @@ For an Isabelle beginner:
    - The last subsection _Summary of dependences_ highlights some selected facts. 
       - In particular, it introduces two equivalent collections of axioms, **ZFfin** and **AST** (for Alternative Set Theory of Petr Vopěnka), that capture two different axiomatizations of the whole theory of hereditarily finite sets.
    
- **ZFfin_HF.thy** is a (very short) theory verifies that the existing [formalization of hereditarily finite sets by Paulson](https://isa-afp.org/entries/HereditarilyFinite.html), based on the Ackermann encoding, is an instance of ZFfin. The theory depends on AFP.
+ **ZFfin_HF.thy** is a (very short) theory verifying that the existing [formalization of hereditarily finite sets by Paulson](https://isa-afp.org/entries/HereditarilyFinite.html), based on the Ackermann encoding, is an instance of ZFfin. The theory depends on AFP.
 
 **Permutation_models.thy** formalizes in full generality the Bernays-Rieger method of construction of nonstandard models. The theory serves as a foundation for two particular models in other theories.
 
