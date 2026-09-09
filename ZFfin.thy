@@ -65,8 +65,7 @@ definition transM:: "'a \<Rightarrow> bool" where
  "transM x \<equiv> \<forall> y. y \<epsilon> x \<longrightarrow> y \<subseteq>\<^sub>M x "
 
 text \<open>Hilbert's description operator @{term The} is used to define sets that are determined by their elements. 
-Resulting set-theoretic operations can and will be used in appropriate contexts only that guarantee
-the existence of corresponding sets, and their unicity (provable with extensionality).\<close>
+Resulting set-theoretic operations can meaningfully be used in appropriate contexts only that guarantee the existence of corresponding sets, and their unicity (provable with extensionality).\<close>
 
 definition collectM :: "('a \<Rightarrow> bool) \<Rightarrow> 'a"  where
  "collectM Q \<equiv> THE z . (\<forall> u . (u \<epsilon> z \<longleftrightarrow> Q u))"
@@ -351,6 +350,10 @@ text \<open>A rule allowing to get rid of quantifiers when proving that a predic
 lemma sfp_all_rule4 [SFP_rules]: assumes "\<And> m. SetFormulaPredicate (\<lambda> \<Xi>. Q (\<Xi> m) (\<Xi> k1) (\<Xi> k2) (\<Xi> k3) (\<Xi> k4))" 
   shows "SetFormulaPredicate (\<lambda> \<Xi>. \<forall> y. Q y (\<Xi> k1) (\<Xi> k2) (\<Xi> k3) (\<Xi> k4))"
   using SFP_all[OF assms, of "k1+k2+k3+k4+1" "k1+k2+k3+k4+1"] by simp
+
+lemma sfp_all_rule6: assumes "\<And> m. SetFormulaPredicate (\<lambda> \<Xi>. Q (\<Xi> m) (\<Xi> k1) (\<Xi> k2) (\<Xi> k3) (\<Xi> k4) (\<Xi> k5) (\<Xi> k6))" 
+  shows "SetFormulaPredicate (\<lambda> \<Xi>. \<forall> y. Q y (\<Xi> k1) (\<Xi> k2) (\<Xi> k3) (\<Xi> k4) (\<Xi> k5) (\<Xi> k6))"
+  using SFP_all[OF assms, of "k1+k2+k3+k4+k5+k6+1" "k1+k2+k3+k4+k5+k6+1"] by simp
 
 named_theorems logsimps
 lemmas[logsimps] = not_not
@@ -875,6 +878,17 @@ lemma dom_SR [simp]: "SetRelation (\<lambda>x u. \<exists>w. x = \<langle>u,w\<r
 lemma rng_SR [simp]: "SetRelation (\<lambda>x u. \<exists>w. x = \<langle>w,u\<rangle>)"
       unfolding SetRelation_def logsimps by (rule SFP_rules)+
 
+lemma SFP_mem_ordered_pair_suc [SFP_rules]: "SetFormulaPredicate (\<lambda> \<Xi>. \<Xi> k \<epsilon> \<langle>\<Xi> l, \<ss>\<uu>\<cc> (\<Xi> m) (\<Xi> n)\<rangle>)"
+proof-
+  have aux: "x \<epsilon> \<langle>y, setsucM z z'\<rangle> \<longleftrightarrow> (\<exists> u. x \<epsilon> \<langle>y,u\<rangle> \<and> u = setsucM z z')" for x y z z'
+    by presburger
+  show ?thesis
+    unfolding aux logsimps set_defs by (rule SFP_rules)+ 
+qed
+
+lemma SFP_eq_ordered_pair_suc [SFP_rules]: "SetFormulaPredicate (\<lambda> \<Xi>. \<Xi> k = \<langle>\<Xi> l, \<ss>\<uu>\<cc> (\<Xi> m) (\<Xi> n)\<rangle>)"
+  unfolding setext logsimps set_defs by (rule SFP_rules)+ 
+
 end 
 
 locale L_binunion = set_signature + 
@@ -966,10 +980,6 @@ proof
     using regsch[OF SFP, unfolded fun_upd_apply] by force
 qed
 
-lemma regsch_epsind:
-   "SetFormulaPredicate Q \<Longrightarrow> (\<forall> x. (\<forall>y. (y \<epsilon> x \<longrightarrow> Q (\<Xi> (0:=y))))  \<longrightarrow>  Q (\<Xi> (0:=x))) \<longrightarrow>  (\<forall> x. Q (\<Xi> (0:=x)))"
-  using regsch[of "\<lambda> x. \<not> Q x" \<Xi>] using SFP_neg by blast 
-
 lemma regsch_mem_not_refl: "\<not> u \<epsilon> u"
 proof
   assume "u \<epsilon> u"
@@ -991,21 +1001,27 @@ locale L_epsind = set_signature +
 
 begin
 
-lemma epsind_regsch: assumes "SetFormulaPredicate P" "\<exists> x. P (\<Xi> (0:=x))" 
-  shows "\<exists> x. P (\<Xi> (0:=x)) \<and> (\<forall> y. y \<epsilon> x \<longrightarrow> \<not> P (\<Xi> (0:=y)))"   
-proof-
-  have SP: "SetFormulaPredicate (\<lambda> x. \<not> P x)"
-    using \<open>SetFormulaPredicate P\<close> by (simp add: SFP_rules)
-  show ?thesis
+sublocale L_regsch
+proof
+  fix P \<Xi>
+  assume "SetFormulaPredicate P"
+  hence SP: "SetFormulaPredicate (\<lambda> x. \<not> P x)"
+    by (simp add: SFP_rules)
+  show "(\<exists>x. P (\<Xi>(0 := x))) \<longrightarrow> (\<exists>x. P (\<Xi>(0 := x)) \<and> (\<forall>y. y \<epsilon> x \<longrightarrow> \<not> P (\<Xi>(0 := y))))"
     unfolding  abstract_foundation_iff[of "\<lambda> x. \<forall> y. y \<epsilon> x \<longrightarrow> \<not> P (\<Xi>(0:=y))" "\<lambda> x. \<not> P (\<Xi>(0:=x))", unfolded not_not]
-    using  epsind[OF SP, rule_format, of \<Xi>] \<open>\<exists> x. P (\<Xi> (0:=x))\<close>
-    by blast+
+    using  epsind[OF SP, rule_format, of \<Xi>]  by blast
 qed
 
-sublocale L_regsch
-  using epsind_regsch by unfold_locales blast
-
 end 
+
+sublocale L_regsch \<subseteq> L_epsind
+proof
+  fix Q \<Xi> 
+  assume "SetFormulaPredicate Q"
+  from regsch[OF SFP_neg, OF this]
+  show  "(\<forall> x. (\<forall>y. (y \<epsilon> x \<longrightarrow> Q (\<Xi> (0:=y))))  \<longrightarrow>  Q (\<Xi> (0:=x))) \<longrightarrow>  (\<forall> x. Q (\<Xi> (0:=x)))"
+    by blast 
+qed
 
 subsection Separation
 
@@ -1494,38 +1510,28 @@ proof (unfold_locales, rule impI)
   assume "\<exists> x. P (\<Xi>(0:=x))"
   then obtain x where "P (\<Xi>(0:=x))" 
     by blast
-  have "x \<subseteq>\<^sub>M (least_tsM x)"  
-    using least_ts_def' subsetM_def by blast
   define w where "w = separationM (least_tsM x) (\<lambda> x. P (\<Xi>(0:=x)))"
   then have w: "u \<epsilon> w \<longleftrightarrow> u \<epsilon> least_tsM x \<and> P (\<Xi>(0:=u))" for u 
     using separ_def_SFP[OF \<open>SetFormulaPredicate P\<close>] by blast
   show "\<exists>x. P (\<Xi>(0 := x)) \<and> (\<forall>y. y \<epsilon> x \<longrightarrow> \<not> P (\<Xi>(0 := y)))"
   proof(cases)
     assume "\<exists> v. v \<epsilon> w"
-    have "(\<exists> v. v \<epsilon> w)\<longrightarrow>(\<exists> v. (v \<epsilon> w \<and> ( \<forall> t. (t \<epsilon> v  \<longrightarrow> \<not> t \<epsilon> w ) ) ) )" 
-      using reg by blast    
-    then have "(\<exists> v. (v \<epsilon> w \<and> ( \<forall> t. (t \<epsilon> v  \<longrightarrow> \<not> t \<epsilon> w ) ) ) )" using \<open>\<exists> v. v \<epsilon> w\<close> by blast
-    then obtain v where "v \<epsilon> w" and v: "t \<epsilon> v  \<longrightarrow> \<not> t \<epsilon> w" for t by blast  
-    have "P (\<Xi>(0 := v))" 
-      using w \<open>v \<epsilon> w\<close> by blast
-    have "v \<epsilon> least_tsM x" 
-      using w \<open>v \<epsilon> w\<close> by blast
-    have "v \<subseteq>\<^sub>M least_tsM x"
-      using least_ts_is_transitive \<open>v \<epsilon> least_tsM x\<close> transM_def by blast
-    have "t \<epsilon> v \<longrightarrow> \<not> P (\<Xi>(0 := t))" for t 
-      using \<open>v \<subseteq>\<^sub>M least_tsM x\<close> w v unfolding subsetM_def by blast 
-    then have "\<forall> t. (t \<epsilon> v \<longrightarrow> \<not> P (\<Xi>(0 := t)))" by blast
-    then have "\<exists>x. P (\<Xi>(0 := x))\<and> (\<forall>y. y \<epsilon> x \<longrightarrow> \<not> P (\<Xi>(0 := y)))"
+    then obtain v where "v \<epsilon> w" and v: "\<forall> t. t \<epsilon> v  \<longrightarrow> \<not> t \<epsilon> w" 
+      using reg by blast  
+    hence "P (\<Xi>(0 := v))" and "v \<epsilon> least_tsM x"
+      using w by blast+
+    hence "v \<subseteq>\<^sub>M least_tsM x"
+      using least_ts_is_transitive transM_def by blast
+    hence "\<not> P (\<Xi>(0 := t))" if "t \<epsilon> v" for t 
+      using v that unfolding w subsetM_def by blast 
+    then show ?thesis 
       using \<open>P (\<Xi>(0 := v))\<close> by blast
-    then show ?thesis by blast
   next
     assume  "\<not> (\<exists> v. v \<epsilon> w)"
-    then have "\<forall> v. (v \<epsilon> least_tsM x \<longrightarrow> \<not> P (\<Xi>(0 := v)) )" 
-      using w  by blast
     then have  "\<forall> v. (v \<epsilon> x \<longrightarrow> \<not> P (\<Xi>(0 := v)) )" 
-       using subsetM_def \<open>x \<subseteq>\<^sub>M least_tsM x\<close> by blast
-     then show ?thesis 
-       using \<open>P (\<Xi>(0 := x))\<close> by blast 
+      using subsetM_def w least_ts_def' by blast
+    then show ?thesis 
+      using \<open>P (\<Xi>(0 := x))\<close> by blast 
   qed
 qed
 
@@ -1617,7 +1623,7 @@ lemma replace_def':
 
 text \<open>Separation can be obtained from replacement.\<close>
 
-sublocale L_setext_sep
+sublocale L_sep
 proof (unfold_locales, rule allI)
   fix P \<Xi> x
   assume sfp: "SetFormulaPredicate P"
@@ -1820,7 +1826,7 @@ sublocale L_setext_empty_repl
 sublocale L_setext_empty_power
   by unfold_locales
 
-sublocale L_setext_empty_setsuc
+sublocale L_setsuc
 proof (unfold_locales, rule allI, rule allI)
   fix x y 
   let ?P = "(\<lambda> \<Xi>. ((\<exists> q. q \<epsilon> (\<Xi> (0::nat))) \<and> (\<forall> q. (q \<epsilon> (\<Xi> 0) \<longleftrightarrow> q = (\<Xi> 1))) \<or> (\<Xi> 1 = \<Xi> 2 \<and> \<not>(\<exists> z. \<forall> q. (q \<epsilon> (\<Xi> 0) \<longleftrightarrow> q = z)))))"
@@ -1875,248 +1881,11 @@ qed
 sublocale L_setext_empty_setsuc_repl
   by unfold_locales
 
-end
-
-subsection \<open>Union\<close>
-
-locale L_union = set_signature + 
-  assumes union: "\<forall> x. \<exists> y.\<forall> v. v \<epsilon> y \<longleftrightarrow> (\<exists> u. u \<epsilon> x \<and> v \<epsilon> u)"
-
-locale L_setext_union = L_setext + L_union 
-
-begin
-
-lemma union_def'[set_defs]: "u \<epsilon> \<Union>\<^sub>M x \<longleftrightarrow> (\<exists> v. v \<epsilon> x \<and> u \<epsilon> v)"
-  using collect_def_ex[OF union[rule_format, of x], folded unionM_def[of x]].
-
-lemma union_trans_trans: assumes "\<forall> v. v \<epsilon> x \<longrightarrow> transM v"
-  shows "transM (\<Union>\<^sub>M x)"
-  using assms unfolding transM_def union_def' subsetM_def by blast
-
-end
-
-locale L_setext_sep_binunion_ts = L_setext + L_sep +  L_binunion + L_ts
-
-begin
-
-sublocale L_setext_binunion
-  by unfold_locales
-
-sublocale L_setext_sep_ts
-  by unfold_locales
-
-lemma trans_union: "transM u \<Longrightarrow> transM v \<Longrightarrow> transM (u \<union>\<^sub>M v)"
-  by (simp add: binunion_def' subsetM_def transM_def)
-
-lemma leastTS_union: "least_tsM (u \<union>\<^sub>M v) = least_tsM u \<union>\<^sub>M least_tsM v"
-  unfolding setext least_ts_def' binunion_def'
-proof (rule allI, rule iffI)
-  fix z
-  assume trans: "\<forall>x. transM x \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x"
-  show "(\<forall>x. transM x \<and> u \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x) \<or> (\<forall>x. transM x \<and> v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x)"
-  proof (rule disjCI)
-    assume "\<not> (\<forall>x. transM x \<and> v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x)"
-    then obtain x where "transM x" "v \<subseteq>\<^sub>M x" "\<not> z \<epsilon> x"
-      by blast
-    show "\<forall>x. transM x \<and> u \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x"
-    proof (rule allI, rule impI)
-      fix y
-      assume "transM y \<and> u \<subseteq>\<^sub>M y"
-      with trans_union[OF \<open>transM x\<close>, of y]  
-      have "transM (x \<union>\<^sub>M y) \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M x \<union>\<^sub>M y"
-        using \<open>v \<subseteq>\<^sub>M x\<close>  binunion_def' subsetM_def by auto
-      from trans[rule_format, OF this]
-      show "z \<epsilon> y"
-        using \<open>\<not> z \<epsilon> x\<close> unfolding binunion_def' by blast
-    qed
-  qed
-next
-  fix z
-  assume or: "(\<forall>x. transM x \<and> u \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x) \<or> (\<forall>x. transM x \<and> v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x)"
-  show "\<forall>y. transM y \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M y \<longrightarrow> z \<epsilon> y"
-  proof (rule allI, rule impI)  
-    fix y
-    assume "transM y \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M y"
-    hence ins: "transM y \<and> u \<subseteq>\<^sub>M y" "transM y \<and> v \<subseteq>\<^sub>M y"
-      unfolding subsetM_def binunion_def' by auto 
-    show "z \<epsilon> y"
-      by (rule disjE[OF or, rule_format]) (use ins in blast)+
-  qed
-qed
-
-end
-
-text \<open>The following locale is called Elementary Set Theory (EST) in Baratella and Ferro, "A theory of Sets with the Negation of the Axiom of Infinity", 1993.\<close>
-
-locale L_setext_empty_union_repl_pair = L_setext + L_empty + L_union + L_repl + L_pair
-
-begin
-
-\<comment> \<open>binunion is the union of a pair\<close>
-sublocale L_setext_pair_binunion
-proof (unfold_locales, rule allI, rule allI) 
-  fix x y
-  from pair[rule_format, of x y] 
-  obtain pair where pair: "\<forall>v. (v \<epsilon> pair) = (v = x \<or> v = y)"
-    by blast
-  show "\<exists>z. \<forall>v. (v \<epsilon> z) = (v \<epsilon> x \<or> v \<epsilon> y)"
-    using union[rule_format, of pair] unfolding pair[rule_format] by simp
-qed
-
-end
-
-text \<open>The locale  \<open>L_setext_empty_union_repl_pair\<close> (i.e., the fragment EST also used by Baratella and Ferro) is the right context in which to show that the schema of regularity yields existence of transitive closures (least transitive supersets)\<close>
-
-locale L_setext_empty_union_repl_pair_regsch = L_setext + L_empty + L_union + L_repl + L_pair + L_regsch
-
-begin
-
-sublocale L_setext_empty_union_repl_pair
-  by unfold_locales
-
-sublocale L_setext_empty_repl
-  by unfold_locales
-
-sublocale L_setext_union
-  by unfold_locales
-
-lemma transitive_closure_ex:
-  shows "\<forall> x. \<exists> z. x \<subseteq>\<^sub>M z \<and> transM z \<and> (\<forall> u. u \<epsilon> z \<longleftrightarrow> (\<forall> t. x \<subseteq>\<^sub>M t \<and> transM t \<longrightarrow> u \<epsilon> t))"
-    (is "\<forall> x. \<exists> z. ?TC x z" is "\<forall> x. ?hasTC x") 
-proof
-  fix x' :: 'a
-  have ind_rule: "SetFormulaPredicate (\<lambda>\<Xi>. ?hasTC(\<Xi> 0)) \<Longrightarrow> (\<And>x. (\<And>y. y \<epsilon> x \<Longrightarrow> ?hasTC y) \<Longrightarrow> ?hasTC x) \<Longrightarrow> ?hasTC x'"
-    using  regsch_epsind[rule_format, of "\<lambda> \<Xi>. ?hasTC(\<Xi> 0)" "undefined" x', unfolded fun_upd_same] by argo
-  show "\<exists>z. x' \<subseteq>\<^sub>M z \<and> transM z \<and> (\<forall>u. (u \<epsilon> z) = (\<forall>t. x' \<subseteq>\<^sub>M t \<and> transM t \<longrightarrow> u \<epsilon> t))"
-  proof (rule ind_rule)
-    fix x
-    define TC where "TC = ?TC" \<comment> \<open>\<open>TC x z\<close> \<close>
-    have sfp_tc: "SetFormulaPredicate (\<lambda>\<Xi>. TC (\<Xi> 0) (\<Xi> 1))"
-      unfolding TC_def set_defs logsimps by (rule SFP_rules)+
-    have tc_fun: "\<forall>u v w. TC u v \<and> TC u w \<longrightarrow> v = w"
-      unfolding TC_def setext by blast
-    show "SetFormulaPredicate (\<lambda>\<Xi>. ?hasTC(\<Xi> 0))"
-      unfolding TC_def set_defs logsimps by (rule SFP_rules)+
-    assume IP: "?hasTC y" if "y \<epsilon> x" for y
-    define tcs where "tcs = \<Union>\<^sub>M (replaceM TC x)"
-    have repl_x: "\<forall>v. (v \<epsilon> replaceM TC x) \<longleftrightarrow> (\<exists>u. u \<epsilon> x \<and> TC u v)" 
-      by (rule replace_def'[OF sfp_tc, of _ 0 1 x, simplified fun_upd_same fun_upd_other]) fact   
-    hence "transM tcs"
-      unfolding TC_def tcs_def union_def' transM_def subsetM_def by blast
-    hence tcs_mem: "w \<epsilon> tcs \<longleftrightarrow> (\<exists> y. y \<epsilon> x \<and> (\<exists> v. TC y v \<and> w \<epsilon> v))" for w
-      unfolding tcs_def using union_def' repl_x by auto 
-    show "?hasTC x"
-    proof (rule exI[of _ "tcs \<union>\<^sub>M x"], fold conj_assoc, rule conjI, rule conjI)
-      show "x \<subseteq>\<^sub>M tcs \<union>\<^sub>M x"
-        unfolding tcs_def set_defs by blast
-      show trans: "transM (tcs \<union>\<^sub>M x)" 
-        unfolding transM_def binunion_def'
-      proof (rule allI, rule impI, erule disjE)
-        show "y \<subseteq>\<^sub>M tcs \<union>\<^sub>M x" if "y \<epsilon> tcs" for y
-          using \<open>transM tcs\<close> that unfolding transM_def binunion_def' subsetM_def by blast 
-        show "y \<subseteq>\<^sub>M tcs \<union>\<^sub>M x" if "y \<epsilon> x" for y
-          unfolding subsetM_def tcs_def binunion_def' union_def' repl_x[rule_format] 
-        proof (rule allI, rule impI, rule disjI1)
-          fix z
-          assume "z \<epsilon> y" 
-          obtain w where  "TC y w"
-            unfolding TC_def using IP[OF \<open>y \<epsilon> x\<close>] by blast
-          hence "z \<epsilon> w"
-            using \<open>z \<epsilon> y\<close> unfolding TC_def subsetM_def by blast
-          hence "(y \<epsilon> x \<and> TC y w) \<and> z \<epsilon> w"
-            using \<open>y \<epsilon> x\<close> \<open>TC y w\<close> by blast
-          then show "\<exists>v. (\<exists>u. u \<epsilon> x \<and> TC u v) \<and> z \<epsilon> v"
-            by blast
-        qed
-      qed
-      show "\<forall>u. (u \<epsilon> tcs \<union>\<^sub>M x) \<longleftrightarrow> (\<forall>t. x \<subseteq>\<^sub>M t \<and> transM t \<longrightarrow> u \<epsilon> t)"
-      proof (rule, rule, rule, rule)
-        \<comment> \<open> \<open>tcs \<union>\<^sub>M x\<close> is the least transitive superset\<close>
-        fix u t
-        assume "u \<epsilon> tcs \<union>\<^sub>M x" "x \<subseteq>\<^sub>M t \<and> transM t"
-        consider "\<exists> y. y \<epsilon> x \<and> (\<exists> w. TC y w \<and> u \<epsilon> w)" | "u \<epsilon> x"
-          using \<open>u \<epsilon> tcs \<union>\<^sub>M x\<close> unfolding set_defs tcs_def repl_x[rule_format] by blast
-        then show "u \<epsilon> t"
-        proof (cases)
-          assume "\<exists> y. y \<epsilon> x \<and> (\<exists> w. TC y w \<and> u \<epsilon> w)"
-          then obtain y w where y_w: "y \<epsilon> x" "TC y w" "u \<epsilon> w"
-            by blast
-          have "y \<subseteq>\<^sub>M t"
-            using \<open>y \<epsilon> x\<close> \<open>x \<subseteq>\<^sub>M t \<and> transM t\<close> unfolding transM_def subsetM_def by blast
-          then show "u \<epsilon> t"
-            using \<open>x \<subseteq>\<^sub>M t \<and> transM t\<close> y_w unfolding TC_def by blast
-        qed (use \<open>x \<subseteq>\<^sub>M t \<and> transM t\<close> subsetM_def in blast) \<comment> \<open>the trivial case \<open>u \<epsilon> x\<close>\<close>
-      qed (use \<open>x \<subseteq>\<^sub>M tcs \<union>\<^sub>M x\<close> local.trans in blast)  \<comment> \<open>the trivial implication: \<open>tcs \<union>\<^sub>M x\<close> is a transitive  superset\<close>
-    qed
-  qed
-qed
-
-sublocale L_setext_sep_reg_ts
-    using transitive_closure_ex by unfold_locales blast   
-
-end
-
-locale L_setext_empty_power_union_repl  = L_setext + L_empty + L_power + L_union + L_repl
-
-\<comment> \<open>ZF without infinity and regularity.
-Axioms enabling reasoning about functions, cardinality, and therefore about Dedekind finiteness.\<close>
-
-begin
-
-sublocale L_setext_empty_power_repl
-  by unfold_locales
-
 sublocale L_setext_setsuc_sep
   by unfold_locales
 
-sublocale L_setext_union
+sublocale L_setext_pair
   by unfold_locales
-
-sublocale L_setext_empty_union_repl_pair
-  by unfold_locales
-
-lemma ordered_pair_mem: assumes "v \<epsilon> x" "v' \<epsilon> y" shows "\<langle>v,v'\<rangle> \<epsilon> \<PP> (\<PP> (x \<union>\<^sub>M y))"
-proof-
-  have "{v}\<^sub>M \<epsilon> \<PP> (x \<union>\<^sub>M y)" "{v,v'}\<^sub>M \<epsilon> \<PP> (x \<union>\<^sub>M y)"
-    using \<open>v \<epsilon> x\<close> \<open>v' \<epsilon> y\<close> unfolding set_defs by blast+
-  thus ?thesis
-    unfolding setext[of _ "\<PP> _"] powerset_def'[of _ "\<PP> _"]
-      pair_def' subsetM_def ordered_pairM_def  by blast
-qed
-
-lemma ordered_pair_mem_union: assumes "\<langle>u,v\<rangle> \<epsilon> r" shows "u \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)" "v \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)"
-proof-
-  have "(\<langle>u,v\<rangle> \<epsilon> r \<and> {u,v}\<^sub>M \<epsilon> \<langle>u,v\<rangle>) \<and> u \<epsilon> {u,v}\<^sub>M" "(\<langle>u,v\<rangle> \<epsilon> r \<and> {u,v}\<^sub>M \<epsilon> \<langle>u,v\<rangle>) \<and> v \<epsilon> {u,v}\<^sub>M"
-    using assms unfolding pair_def' ordered_pairM_def by blast+
-  then show "u \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)" "v \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)" 
-    unfolding union_def' by blast+
-qed
-
-lemma car_prod_ex: "\<exists> z. \<forall> u. u \<epsilon> z \<longleftrightarrow> (\<exists> v v'. v \<epsilon> x \<and> v' \<epsilon> y \<and> u = \<langle>v,v'\<rangle>)"
-proof-
-  have "SetFormulaPredicate (\<lambda>\<Xi>. \<exists>v v'. v \<epsilon> \<Xi> 1 \<and> v' \<epsilon> \<Xi> 2 \<and> \<Xi> 0 = \<langle>v,v'\<rangle>)"
-    unfolding set_defs logsimps by (rule SFP_rules)+
-  from sep[rule_format, of _ "\<PP> (\<PP> (x \<union>\<^sub>M y))" "undefined(1:=x,2:=y)", OF this, simplified]
-  show ?thesis
-    using ordered_pair_mem by metis
-qed
-
-lemma car_prod_def': "u \<epsilon> x \<times>\<^sub>M y \<longleftrightarrow> (\<exists> v v'.  v \<epsilon> x \<and> v' \<epsilon> y \<and>  u = \<langle>v,v'\<rangle>)"
-  unfolding cartesian_productM_def[rule_format] 
-  using collect_def_ex[OF car_prod_ex, of _ x y] ordered_pair_mem by blast
-
-lemma rel_inv_def': "u \<epsilon> rel_inverseM r \<longleftrightarrow> (\<exists> a b. \<langle>a,b\<rangle> \<epsilon> r \<and> u = \<langle>b,a\<rangle>)"
-proof-
-  have SR: "SetRelation (\<lambda>u r. \<exists>a b. \<langle>a,b\<rangle> \<epsilon> r \<and> u = \<langle>b,a\<rangle>)"
-    unfolding SetRelation_def logsimps by (rule SFP_rules)+ 
-  have eq: "(u \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r) \<times>\<^sub>M \<Union>\<^sub>M (\<Union>\<^sub>M r) \<and> (\<exists>a b. \<langle>a,b\<rangle> \<epsilon> r \<and> u = \<langle>b,a\<rangle>))
-            \<longleftrightarrow> (\<exists>a b. \<langle>a,b\<rangle> \<epsilon> r \<and> u = \<langle>b,a\<rangle>)" for u
-    unfolding car_prod_def'[rule_format] using ordered_pair_mem_union by blast 
-    show ?thesis
-      unfolding rel_inverseM_def 
-      using collect_def_ex[of "\<lambda> v. (\<exists> a b. \<langle>a,b\<rangle> \<epsilon> r \<and> v = \<langle>b,a\<rangle>)"]
-      sep_SR[rule_format,OF SR, of "\<Union>\<^sub>M (\<Union>\<^sub>M r) \<times>\<^sub>M \<Union>\<^sub>M (\<Union>\<^sub>M r)" r, unfolded eq] by simp
-qed
 
 lemma dom_def': "u \<epsilon> domM r \<longleftrightarrow> (\<exists>v. \<langle>u,v\<rangle> \<epsilon> r)"
   unfolding domM_def 
@@ -2158,15 +1927,6 @@ lemma SP_dedekind[simp]: "SetProperty dedekind_fin"
 
 lemma SR_card: "SetRelation cardinality"
   unfolding set_defs logsimps SetRelation_def by (rule SFP_rules)+
-
-lemma rel_inv_dom_rng: "domM (rel_inverseM r) = rngM r" "rngM (rel_inverseM r) = domM r"
-  unfolding setext[of _ "rngM _"] setext[of _ "domM _"] dom_def' rng_def' rel_inv_def' ordered_pair_unique by blast+
-
-lemma rel_inv_rel: "relationM f \<Longrightarrow> relationM (rel_inverseM f)"
-  unfolding relationM_def rel_inv_def' by blast  
-
-lemma one_one_inv: "one_oneM f \<Longrightarrow> one_oneM (rel_inverseM f)"
-  unfolding one_oneM_def rel_inv_def' functionM_def ordered_pair_unique using rel_inv_rel by auto
 
 lemma dedekind_setsuc_dedekind: assumes "dedekind_fin x" shows "dedekind_fin (setsucM x t)"
 proof (cases "t \<epsilon> x") 
@@ -2286,6 +2046,31 @@ proof (cases "t \<epsilon> x")
   qed
 qed (simp add: assms)    
 
+lemma rel_inv_def': "u \<epsilon> rel_inverseM r \<longleftrightarrow> (\<exists> a b. \<langle>a,b\<rangle> \<epsilon> r \<and> u = \<langle>b,a\<rangle>)"
+  thm repl_SR
+proof-
+  have SR: "SetRelation (\<lambda> u v. \<exists>a b. u = \<langle>a,b\<rangle>  \<and> v = \<langle>b,a\<rangle>)"
+    unfolding SetRelation_def logsimps by (rule SFP_rules)+ 
+  have func: "\<forall>u v w. (\<exists>a b. u = \<langle>a,b\<rangle> \<and> v = \<langle>b,a\<rangle>) \<and> (\<exists>a b. u = \<langle>a,b\<rangle> \<and> w = \<langle>b,a\<rangle>) \<longrightarrow> v = w"
+    by auto
+  have aux: "(\<exists>p. p \<epsilon> r \<and> (\<exists>a b. p = \<langle>a,b\<rangle> \<and> u = \<langle>b,a\<rangle>)) \<longleftrightarrow> (\<exists> a b. \<langle>a,b\<rangle> \<epsilon> r \<and> u = \<langle>b,a\<rangle>)" for u
+    by blast
+  from repl_SR[OF SR func, rule_format, of r, unfolded aux]
+  have inv_ex: "\<exists>z. \<forall>v. (v \<epsilon> z) = (\<exists>a b. \<langle>a,b\<rangle> \<epsilon> r \<and> v = \<langle>b,a\<rangle>)".
+    show ?thesis
+      unfolding rel_inverseM_def 
+      using collect_def_ex[OF inv_ex]. 
+qed
+
+lemma rel_inv_dom_rng: "domM (rel_inverseM r) = rngM r" "rngM (rel_inverseM r) = domM r"
+  unfolding setext[of _ "rngM _"] setext[of _ "domM _"] dom_def' rng_def' rel_inv_def' ordered_pair_unique by blast+
+
+lemma rel_inv_rel: "relationM f \<Longrightarrow> relationM (rel_inverseM f)"
+  unfolding relationM_def rel_inv_def' by blast  
+
+lemma one_one_inv: "one_oneM f \<Longrightarrow> one_oneM (rel_inverseM f)"
+  unfolding one_oneM_def rel_inv_def' functionM_def ordered_pair_unique using rel_inv_rel by auto
+
 lemma set_equivalent_sym: "x \<approx>\<^sub>M y \<longleftrightarrow> y \<approx>\<^sub>M x"
 proof-
   have "x \<approx>\<^sub>M y \<Longrightarrow>  y \<approx>\<^sub>M x" for x y
@@ -2301,39 +2086,60 @@ proof-
     by blast
 qed
 
-lemma compose_def': "u \<epsilon> f \<circ>\<^sub>M g \<longleftrightarrow> (\<exists>a b c. \<langle>a,b\<rangle> \<epsilon> g \<and> \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>)"
+lemma fun_compose_def': 
+  assumes "functionM f"
+  shows "u \<epsilon> f \<circ>\<^sub>M g \<longleftrightarrow> (\<exists>a b c. \<langle>a,b\<rangle> \<epsilon> g \<and> \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>)"
 proof-
-  have ex: "\<exists>w. \<forall>u. (u \<epsilon> w) = (u \<epsilon> domM g \<times>\<^sub>M rngM f  \<and> (\<exists>a b c. \<langle>a,b\<rangle> \<epsilon> g \<and> \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>))"
-    using sep[rule_format, OF SFP_compose[of 1 2 0], of "domM g \<times>\<^sub>M rngM f" "undefined(1:=g, 2:= f)"] 
-    by simp
-  have aux: "u \<epsilon> domM g \<times>\<^sub>M rngM f  \<and> (\<exists>a b c. \<langle>a,b\<rangle> \<epsilon> g \<and> \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>) \<longleftrightarrow> (\<exists>a b c. \<langle>a,b\<rangle> \<epsilon> g \<and> \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>)" for u
-    using dom_def' rng_def' car_prod_def' by auto
-  have "u \<epsilon> f \<circ>\<^sub>M g \<longleftrightarrow> (\<exists>a b c. \<langle>a,b\<rangle> \<epsilon> g \<and> \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>)" (is "u \<epsilon> f \<circ>\<^sub>M g \<longleftrightarrow> ?Q u")
-    unfolding composeM_def  
-    using collect_def_ex[of "\<lambda> u. ?Q u", OF ex[unfolded aux]].  
-  then show ?thesis
-    unfolding car_prod_def' dom_def'[of _ g] rng_def'[of _ f]  by blast 
-qed  
+  let ?P = "\<lambda> (\<Xi> :: nat \<Rightarrow> 'a). (\<exists> a b c. \<Xi> 0 = \<langle>a,b\<rangle> \<and> \<langle>b,c\<rangle> \<epsilon> \<Xi> 3 \<and> \<Xi> 1 = \<langle>a,c\<rangle>)"
+  have sfp: "SetFormulaPredicate ?P"
+    unfolding logsimps set_defs by (rule SFP_rules | rule sfp_all_rule6)+    
+  have func:  "\<forall> u v w. ?P (undefined(3 := f, 0 := u, 1 := v))
+               \<and> ?P (undefined(3 := f, 0 := u, 1 := w)) \<longrightarrow>   v = w"
+    using \<open>functionM f\<close>[unfolded functionM_def] by auto
+  note ex = replp[of ?P, OF sfp, of "undefined (3:= f)", OF func, rule_format, of g]
+  have aux: 
+    "(\<exists>a b. \<langle>a,b\<rangle> \<epsilon> g \<and> (\<exists>c. \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>)) \<longleftrightarrow> (\<exists>ua. ua \<epsilon> g \<and> (\<exists>a b. ua = \<langle>a,b\<rangle> \<and> (\<exists>c. \<langle>b,c\<rangle> \<epsilon> f \<and> u = \<langle>a,c\<rangle>)))" for u  by blast+
+  show ?thesis
+    using collect_def_ex[OF ex] unfolding composeM_def by (simp add: aux)
+qed
 
-lemma rel_comp: assumes "relationM f" "relationM g" shows "relationM (f \<circ>\<^sub>M g)"
-  using assms unfolding relationM_def compose_def' by blast
+lemma rel_comp: assumes "functionM f" "relationM g" shows "relationM (f \<circ>\<^sub>M g)"
+  using assms fun_compose_def' relationM_def  by fast
 
 lemma fun_comp: assumes "functionM f" "functionM g" shows "functionM (f \<circ>\<^sub>M g)"
-  using assms rel_comp unfolding functionM_def  compose_def' ordered_pair_unique by blast 
+  using assms rel_comp unfolding functionM_def fun_compose_def'[OF \<open>functionM f\<close>]   ordered_pair_unique
+  by blast
 
 lemma one_one_comp: assumes "one_oneM f" "one_oneM g" shows "one_oneM (f \<circ>\<^sub>M g)"
-  using assms fun_comp unfolding one_oneM_def  compose_def' ordered_pair_unique by blast  
+ unfolding one_oneM_def
+proof
+  have "functionM f" "functionM g"
+    using assms unfolding one_oneM_def by blast+
+  from fun_comp[OF this]
+  show "functionM (f \<circ>\<^sub>M g)".
+  show "\<forall>a b c. \<langle>b,a\<rangle> \<epsilon> f \<circ>\<^sub>M g \<and> \<langle>c,a\<rangle> \<epsilon> f \<circ>\<^sub>M g \<longrightarrow> b = c"
+  proof ((rule allI)+, rule impI)
+    fix a b c
+    assume "\<langle>b,a\<rangle> \<epsilon> f \<circ>\<^sub>M g \<and> \<langle>c,a\<rangle> \<epsilon> f \<circ>\<^sub>M g "
+    with fun_compose_def'[OF \<open>functionM f\<close>, of _ g] 
+    obtain db dc where "\<langle>b,db\<rangle> \<epsilon> g" "\<langle>c,dc\<rangle> \<epsilon> g" "\<langle>db,a\<rangle> \<epsilon> f" "\<langle>dc,a\<rangle> \<epsilon> f"
+      by auto
+    with assms[unfolded one_oneM_def]
+    show "b = c"
+      by blast
+  qed
+qed
 
 lemma set_equivalent_trans: assumes "x \<approx>\<^sub>M y" "y \<approx>\<^sub>M z" shows "x \<approx>\<^sub>M z"
 proof-
-  obtain f1 where f1: "one_oneM f1" and  "x = domM f1" "y = rngM f1"
+  obtain f1 where f1: "one_oneM f1"  "x = domM f1" "y = rngM f1"
     using \<open>x \<approx>\<^sub>M y\<close> unfolding set_equivalent_def by blast
-  obtain f2 where f2: "one_oneM f2" and "y = domM f2" "z = rngM f2"
-    using \<open>y \<approx>\<^sub>M z\<close> unfolding set_equivalent_def by blast
+  obtain f2 where f2: "one_oneM f2" and "functionM f2"  and "y = domM f2" "z = rngM f2"
+    using \<open>y \<approx>\<^sub>M z\<close> one_oneM_def  unfolding set_equivalent_def by blast
   have "one_oneM (f2 \<circ>\<^sub>M f1)"
     using f1 f2 one_one_comp by blast
   have "x = domM (f2 \<circ>\<^sub>M f1)"
-     unfolding dom_def'  setext unfolding compose_def' ordered_pair_unique
+     unfolding dom_def'  setext unfolding fun_compose_def'[OF \<open>functionM f2\<close>] ordered_pair_unique
    proof (rule allI, rule iffI)
      fix u assume "\<exists>v a b c. \<langle>a,b\<rangle> \<epsilon> f1 \<and> \<langle>b,c\<rangle> \<epsilon> f2 \<and> u = a \<and> v = c"
      then show "u \<epsilon> x"
@@ -2350,7 +2156,7 @@ proof-
        using \<open>\<langle>u,b\<rangle> \<epsilon> f1\<close> \<open>\<langle>b,c\<rangle> \<epsilon> f2\<close> by auto
    qed
   have "z = rngM (f2 \<circ>\<^sub>M f1)"
-     unfolding rng_def'  setext unfolding compose_def' ordered_pair_unique
+     unfolding rng_def'  setext unfolding fun_compose_def'[OF \<open>functionM f2\<close>] ordered_pair_unique
    proof (rule allI, rule iffI)
      fix u assume "\<exists>v a b c. \<langle>a,b\<rangle> \<epsilon> f1 \<and> \<langle>b,c\<rangle> \<epsilon> f2 \<and> v = a \<and> u = c"
      then show "u \<epsilon> z"
@@ -2370,6 +2176,276 @@ proof-
       unfolding set_equivalent_def
       using \<open>one_oneM (f2 \<circ>\<^sub>M f1)\<close> \<open>x = domM (f2 \<circ>\<^sub>M f1)\<close> \<open>z = rngM (f2 \<circ>\<^sub>M f1)\<close> by blast 
 qed
+
+lemma card_emp: "cardinality \<emptyset> \<emptyset>" 
+proof-
+  have "natM \<emptyset>"
+    by simp
+  moreover have "one_oneM \<emptyset>" 
+    unfolding one_oneM_def functionM_def relationM_def by simp
+  moreover have "\<emptyset> = domM \<emptyset>" "\<emptyset> = rngM \<emptyset>"                          
+    unfolding setext dom_def' rng_def' by simp_all 
+  ultimately show ?thesis
+    unfolding cardinality_def set_equivalent_def 
+    using exI[of "\<lambda> f.  one_oneM f \<and> \<emptyset> = domM f \<and> \<emptyset> = rngM f" \<emptyset>] by blast
+qed
+
+lemma card_setsuc: assumes "\<not> y \<epsilon> x" "cardinality x m" shows "cardinality (setsucM x y)  (setsucM m m)"
+proof-
+  obtain f where "one_oneM f" "x = domM f" "m = rngM f" "natM m"
+    using \<open>cardinality x m\<close> unfolding cardinality_def set_equivalent_def by blast
+  let ?f = "setsucM f (\<langle>y,m\<rangle>)"
+  have "natM (setsucM m m)"
+    by (simp add: \<open>natM m\<close> nat_suc_nat)
+  have "setsucM x y = domM ?f"
+    using \<open>x = domM f\<close> unfolding setext dom_def' by auto
+  have "setsucM m m = rngM ?f"
+    using \<open>m = rngM f\<close> unfolding setext rng_def' by auto
+  have "relationM ?f"
+    unfolding relationM_def
+    using \<open>one_oneM f\<close> functionM_def one_oneM_def relationM_def by auto 
+  then have "functionM ?f"
+    unfolding functionM_def
+    using \<open>one_oneM f\<close> \<open>x = domM f\<close> \<open>\<not> y \<epsilon> x\<close> dom_def' funD one_oneD3 by auto 
+  then have "one_oneM ?f"
+    unfolding one_oneM_def 
+    using   \<open>\<not> y \<epsilon> x\<close> one_one_inj[OF \<open>one_oneM f\<close>] \<open>m = rngM f\<close> rng_def'
+    by (metis \<open>natM m\<close> natM_def ordM_def ordered_pair_unique regular_antisym2_mem setsuc_def') 
+  show ?thesis
+    unfolding cardinality_def set_equivalent_def 
+    using \<open>setsucM m m = rngM ?f\<close> \<open>natM (setsucM m m)\<close> \<open>one_oneM ?f\<close> \<open>setsucM x y = domM ?f\<close> by blast
+qed                                    
+
+end
+
+subsection \<open>Union\<close>
+
+locale L_union = set_signature + 
+  assumes union: "\<forall> x. \<exists> y.\<forall> v. v \<epsilon> y \<longleftrightarrow> (\<exists> u. u \<epsilon> x \<and> v \<epsilon> u)"
+
+locale L_setext_union = L_setext + L_union 
+
+begin
+
+lemma union_def'[set_defs]: "u \<epsilon> \<Union>\<^sub>M x \<longleftrightarrow> (\<exists> v. v \<epsilon> x \<and> u \<epsilon> v)"
+  using collect_def_ex[OF union[rule_format, of x], folded unionM_def[of x]].
+
+lemma union_trans_trans: assumes "\<forall> v. v \<epsilon> x \<longrightarrow> transM v"
+  shows "transM (\<Union>\<^sub>M x)"
+  using assms unfolding transM_def union_def' subsetM_def by blast
+
+end
+
+locale L_setext_sep_binunion_ts = L_setext + L_sep +  L_binunion + L_ts
+
+begin
+
+sublocale L_setext_binunion
+  by unfold_locales
+
+sublocale L_setext_sep_ts
+  by unfold_locales
+
+lemma trans_union: "transM u \<Longrightarrow> transM v \<Longrightarrow> transM (u \<union>\<^sub>M v)"
+  by (simp add: binunion_def' subsetM_def transM_def)
+
+lemma leastTS_union: "least_tsM (u \<union>\<^sub>M v) = least_tsM u \<union>\<^sub>M least_tsM v"
+  unfolding setext least_ts_def' binunion_def'
+proof (rule allI, rule iffI)
+  fix z
+  assume trans: "\<forall>x. transM x \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x"
+  show "(\<forall>x. transM x \<and> u \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x) \<or> (\<forall>x. transM x \<and> v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x)"
+  proof (rule disjCI)
+    assume "\<not> (\<forall>x. transM x \<and> v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x)"
+    then obtain x where "transM x" "v \<subseteq>\<^sub>M x" "\<not> z \<epsilon> x"
+      by blast
+    show "\<forall>x. transM x \<and> u \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x"
+    proof (rule allI, rule impI)
+      fix y
+      assume "transM y \<and> u \<subseteq>\<^sub>M y"
+      with trans_union[OF \<open>transM x\<close>, of y]  
+      have "transM (x \<union>\<^sub>M y) \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M x \<union>\<^sub>M y"
+        using \<open>v \<subseteq>\<^sub>M x\<close>  binunion_def' subsetM_def by auto
+      from trans[rule_format, OF this]
+      show "z \<epsilon> y"
+        using \<open>\<not> z \<epsilon> x\<close> unfolding binunion_def' by blast
+    qed
+  qed
+next
+  fix z
+  assume or: "(\<forall>x. transM x \<and> u \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x) \<or> (\<forall>x. transM x \<and> v \<subseteq>\<^sub>M x \<longrightarrow> z \<epsilon> x)"
+  show "\<forall>y. transM y \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M y \<longrightarrow> z \<epsilon> y"
+  proof (rule allI, rule impI)  
+    fix y
+    assume "transM y \<and> u \<union>\<^sub>M v \<subseteq>\<^sub>M y"
+    hence ins: "transM y \<and> u \<subseteq>\<^sub>M y" "transM y \<and> v \<subseteq>\<^sub>M y"
+      unfolding subsetM_def binunion_def' by auto 
+    show "z \<epsilon> y"
+      by (rule disjE[OF or, rule_format]) (use ins in blast)+
+  qed
+qed
+
+end
+
+text \<open>The following locale is called Elementary Set Theory (EST) in Baratella and Ferro, "A theory of Sets with the Negation of the Axiom of Infinity", 1993.\<close>
+
+locale L_setext_empty_union_repl_pair = L_setext + L_empty + L_union + L_repl + L_pair
+
+begin
+
+\<comment> \<open>binunion is the union of a pair\<close>
+sublocale L_binunion
+proof (unfold_locales, rule allI, rule allI) 
+  fix x y
+  from pair[rule_format, of x y] 
+  obtain pair where pair: "\<forall>v. (v \<epsilon> pair) = (v = x \<or> v = y)"
+    by blast
+  show "\<exists>z. \<forall>v. (v \<epsilon> z) = (v \<epsilon> x \<or> v \<epsilon> y)"
+    using union[rule_format, of pair] unfolding pair[rule_format] by simp
+qed
+
+sublocale L_setext_pair_binunion
+  by unfold_locales
+
+end
+
+text \<open>The locale  \<open>L_setext_empty_union_repl_pair\<close> (i.e., the fragment EST also used by Baratella and Ferro \<open>BaratellaFerro1993\<close>) is the right context in which to show that the schema of regularity yields existence of transitive closures (least transitive supersets)\<close>
+
+locale L_setext_empty_union_repl_pair_regsch = L_setext + L_empty + L_union + L_repl + L_pair + L_regsch
+
+begin
+
+sublocale L_setext_empty_union_repl_pair
+  by unfold_locales
+
+sublocale L_setext_empty_repl
+  by unfold_locales
+
+sublocale L_setext_union
+  by unfold_locales
+
+lemma transitive_closure_ex:
+  shows "\<forall> x. \<exists> z. x \<subseteq>\<^sub>M z \<and> transM z \<and> (\<forall> u. u \<epsilon> z \<longleftrightarrow> (\<forall> t. x \<subseteq>\<^sub>M t \<and> transM t \<longrightarrow> u \<epsilon> t))"
+    (is "\<forall> x. \<exists> z. ?TC x z" is "\<forall> x. ?hasTC x") 
+proof
+  fix x' :: 'a
+  have ind_rule: "SetFormulaPredicate (\<lambda>\<Xi>. ?hasTC(\<Xi> 0)) \<Longrightarrow> (\<And>x. (\<And>y. y \<epsilon> x \<Longrightarrow> ?hasTC y) \<Longrightarrow> ?hasTC x) \<Longrightarrow> ?hasTC x'"
+    using  epsind[rule_format, of "\<lambda> \<Xi>. ?hasTC(\<Xi> 0)" "undefined" x', unfolded fun_upd_same] by argo
+  show "\<exists>z. x' \<subseteq>\<^sub>M z \<and> transM z \<and> (\<forall>u. (u \<epsilon> z) = (\<forall>t. x' \<subseteq>\<^sub>M t \<and> transM t \<longrightarrow> u \<epsilon> t))"
+  proof (rule ind_rule)
+    fix x
+    define TC where "TC = ?TC" \<comment> \<open>\<open>TC x z\<close> \<close>
+    have sfp_tc: "SetFormulaPredicate (\<lambda>\<Xi>. TC (\<Xi> 0) (\<Xi> 1))"
+      unfolding TC_def set_defs logsimps by (rule SFP_rules)+
+    have tc_fun: "\<forall>u v w. TC u v \<and> TC u w \<longrightarrow> v = w"
+      unfolding TC_def setext by blast
+    show "SetFormulaPredicate (\<lambda>\<Xi>. ?hasTC(\<Xi> 0))"
+      unfolding TC_def set_defs logsimps by (rule SFP_rules)+
+    assume IP: "?hasTC y" if "y \<epsilon> x" for y
+    define tcs where "tcs = \<Union>\<^sub>M (replaceM TC x)"
+    have repl_x: "\<forall>v. (v \<epsilon> replaceM TC x) \<longleftrightarrow> (\<exists>u. u \<epsilon> x \<and> TC u v)" 
+      by (rule replace_def'[OF sfp_tc, of _ 0 1 x, simplified fun_upd_same fun_upd_other]) fact   
+    hence "transM tcs"
+      unfolding TC_def tcs_def union_def' transM_def subsetM_def by blast
+    hence tcs_mem: "w \<epsilon> tcs \<longleftrightarrow> (\<exists> y. y \<epsilon> x \<and> (\<exists> v. TC y v \<and> w \<epsilon> v))" for w
+      unfolding tcs_def using union_def' repl_x by auto 
+    show "?hasTC x"
+    proof (rule exI[of _ "tcs \<union>\<^sub>M x"], fold conj_assoc, rule conjI, rule conjI)
+      show "x \<subseteq>\<^sub>M tcs \<union>\<^sub>M x"
+        unfolding tcs_def set_defs by blast
+      show trans: "transM (tcs \<union>\<^sub>M x)" 
+        unfolding transM_def binunion_def'
+      proof (rule allI, rule impI, erule disjE)
+        show "y \<subseteq>\<^sub>M tcs \<union>\<^sub>M x" if "y \<epsilon> tcs" for y
+          using \<open>transM tcs\<close> that unfolding transM_def binunion_def' subsetM_def by blast 
+        show "y \<subseteq>\<^sub>M tcs \<union>\<^sub>M x" if "y \<epsilon> x" for y
+          unfolding subsetM_def tcs_def binunion_def' union_def' repl_x[rule_format] 
+        proof (rule allI, rule impI, rule disjI1)
+          fix z
+          assume "z \<epsilon> y" 
+          obtain w where  "TC y w"
+            unfolding TC_def using IP[OF \<open>y \<epsilon> x\<close>] by blast
+          hence "z \<epsilon> w"
+            using \<open>z \<epsilon> y\<close> unfolding TC_def subsetM_def by blast
+          hence "(y \<epsilon> x \<and> TC y w) \<and> z \<epsilon> w"
+            using \<open>y \<epsilon> x\<close> \<open>TC y w\<close> by blast
+          then show "\<exists>v. (\<exists>u. u \<epsilon> x \<and> TC u v) \<and> z \<epsilon> v"
+            by blast
+        qed
+      qed
+      show "\<forall>u. (u \<epsilon> tcs \<union>\<^sub>M x) \<longleftrightarrow> (\<forall>t. x \<subseteq>\<^sub>M t \<and> transM t \<longrightarrow> u \<epsilon> t)"
+      proof (rule, rule, rule, rule)
+        \<comment> \<open> \<open>tcs \<union>\<^sub>M x\<close> is the least transitive superset\<close>
+        fix u t
+        assume "u \<epsilon> tcs \<union>\<^sub>M x" "x \<subseteq>\<^sub>M t \<and> transM t"
+        consider "\<exists> y. y \<epsilon> x \<and> (\<exists> w. TC y w \<and> u \<epsilon> w)" | "u \<epsilon> x"
+          using \<open>u \<epsilon> tcs \<union>\<^sub>M x\<close> unfolding set_defs tcs_def repl_x[rule_format] by blast
+        then show "u \<epsilon> t"
+        proof (cases)
+          assume "\<exists> y. y \<epsilon> x \<and> (\<exists> w. TC y w \<and> u \<epsilon> w)"
+          then obtain y w where y_w: "y \<epsilon> x" "TC y w" "u \<epsilon> w"
+            by blast
+          have "y \<subseteq>\<^sub>M t"
+            using \<open>y \<epsilon> x\<close> \<open>x \<subseteq>\<^sub>M t \<and> transM t\<close> unfolding transM_def subsetM_def by blast
+          then show "u \<epsilon> t"
+            using \<open>x \<subseteq>\<^sub>M t \<and> transM t\<close> y_w unfolding TC_def by blast
+        qed (use \<open>x \<subseteq>\<^sub>M t \<and> transM t\<close> subsetM_def in blast) \<comment> \<open>the trivial case \<open>u \<epsilon> x\<close>\<close>
+      qed (use \<open>x \<subseteq>\<^sub>M tcs \<union>\<^sub>M x\<close> local.trans in blast)  \<comment> \<open>the trivial implication: \<open>tcs \<union>\<^sub>M x\<close> is a transitive  superset\<close>
+    qed
+  qed
+qed
+
+sublocale L_ts
+  using transitive_closure_ex by unfold_locales blast   
+
+sublocale L_setext_sep_reg_ts
+ by unfold_locales
+
+end
+
+
+locale L_setext_empty_power_union_repl = L_setext + L_empty + L_power + L_union + L_repl
+
+begin
+
+sublocale L_setext_empty_power_repl
+  by unfold_locales
+
+sublocale L_setext_union
+  by unfold_locales
+
+sublocale L_setext_empty_union_repl_pair
+  by unfold_locales
+
+lemma ordered_pair_mem: assumes "v \<epsilon> x" "v' \<epsilon> y" shows "\<langle>v,v'\<rangle> \<epsilon> \<PP> (\<PP> (x \<union>\<^sub>M y))"
+proof-
+  have "{v}\<^sub>M \<epsilon> \<PP> (x \<union>\<^sub>M y)" "{v,v'}\<^sub>M \<epsilon> \<PP> (x \<union>\<^sub>M y)"
+    using \<open>v \<epsilon> x\<close> \<open>v' \<epsilon> y\<close> unfolding set_defs by blast+
+  thus ?thesis
+    unfolding setext[of _ "\<PP> _"] powerset_def'[of _ "\<PP> _"]
+      pair_def' subsetM_def ordered_pairM_def  by blast
+qed
+
+lemma ordered_pair_mem_union: assumes "\<langle>u,v\<rangle> \<epsilon> r" shows "u \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)" "v \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)"
+proof-
+  have "(\<langle>u,v\<rangle> \<epsilon> r \<and> {u,v}\<^sub>M \<epsilon> \<langle>u,v\<rangle>) \<and> u \<epsilon> {u,v}\<^sub>M" "(\<langle>u,v\<rangle> \<epsilon> r \<and> {u,v}\<^sub>M \<epsilon> \<langle>u,v\<rangle>) \<and> v \<epsilon> {u,v}\<^sub>M"
+    using assms unfolding pair_def' ordered_pairM_def by blast+
+  then show "u \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)" "v \<epsilon> \<Union>\<^sub>M (\<Union>\<^sub>M r)" 
+    unfolding union_def' by blast+
+qed
+
+lemma car_prod_ex: "\<exists> z. \<forall> u. u \<epsilon> z \<longleftrightarrow> (\<exists> v v'. v \<epsilon> x \<and> v' \<epsilon> y \<and> u = \<langle>v,v'\<rangle>)"
+proof-
+  have "SetFormulaPredicate (\<lambda>\<Xi>. \<exists>v v'. v \<epsilon> \<Xi> 1 \<and> v' \<epsilon> \<Xi> 2 \<and> \<Xi> 0 = \<langle>v,v'\<rangle>)"
+    unfolding set_defs logsimps by (rule SFP_rules)+
+  from sep[rule_format, of _ "\<PP> (\<PP> (x \<union>\<^sub>M y))" "undefined(1:=x,2:=y)", OF this, simplified]
+  show ?thesis
+    using ordered_pair_mem by metis
+qed
+
+lemma car_prod_def': "u \<epsilon> x \<times>\<^sub>M y \<longleftrightarrow> (\<exists> v v'.  v \<epsilon> x \<and> v' \<epsilon> y \<and>  u = \<langle>v,v'\<rangle>)"
+  unfolding cartesian_productM_def[rule_format]
+  using collect_def_ex[OF car_prod_ex, of _ x y] ordered_pair_mem by blast
 
 lemma union_of_ords_regular: assumes "\<forall> y. y \<epsilon> s \<longrightarrow> ordM y"
   shows "regular (\<Union>\<^sub>M s)"
@@ -2464,7 +2540,7 @@ proof (rule ccontr)
     by (metis emptyset_def' subsetM_def) 
 qed
 
-\<comment> \<open>Schema of induction for natural numbers\<close>
+(* \<comment> \<open>Schema of induction for natural numbers\<close> *)
 lemma nat_induction_sp: assumes "SetProperty P" and  "P \<emptyset>" and "natM x" and
   step: "\<And> x. natM x \<Longrightarrow> P x \<Longrightarrow> P (setsucM x x)"
 shows "P x"
@@ -2475,19 +2551,6 @@ theorem nat_tarski_fin: assumes "natM x" shows "tarski_fin x"
 
 lemma nat_dedekind_finite: assumes "natM x"  shows "dedekind_fin x"
   using nat_induction_sp[OF SP_dedekind empty_dedekind \<open>natM x\<close>] dedekind_setsuc_dedekind by blast
-
-lemma card_emp: "cardinality \<emptyset> \<emptyset>" 
-proof-
-  have "natM \<emptyset>"
-    by simp
-  moreover have "one_oneM \<emptyset>" 
-    unfolding one_oneM_def functionM_def relationM_def by simp
-  moreover have "\<emptyset> = domM \<emptyset>" "\<emptyset> = rngM \<emptyset>"                          
-    unfolding setext dom_def' rng_def' by simp_all 
-  ultimately show ?thesis
-    unfolding cardinality_def set_equivalent_def 
-    using exI[of "\<lambda> f.  one_oneM f \<and> \<emptyset> = domM f \<and> \<emptyset> = rngM f" \<emptyset>] by blast
-qed
 
 lemma nat_equiv_unique: assumes "natM x" "natM y" "x \<approx>\<^sub>M y"
   shows "x = y"
@@ -2507,13 +2570,12 @@ lemma card_fun: assumes "cardinality x n" "cardinality x m" shows "n = m"
 
 end
 
-locale L_setext_empty_power_union_repl_reg  = L_setext + L_empty + L_power + L_union + L_repl 
-+ L_reg
+locale L_setext_empty_power_repl_reg  = L_setext + L_empty + L_power + L_repl + L_reg
 
 begin
 text \<open>Some consequences of the axiom of regularity\<close>
 
-sublocale L_setext_empty_power_union_repl
+sublocale L_setext_empty_power_repl
   by unfold_locales
 
 lemma mem_not_refl: "\<not> x \<epsilon> x"
@@ -2540,38 +2602,12 @@ lemma suc_subset[simp]: "z \<subset>\<^sub>M setsucM z z"
   unfolding proper_subsetM_def  setext setsuc_def'
   singleton_def' using mem_not_refl[of z] by blast
 
-lemma card_setsuc: assumes "\<not> y \<epsilon> x" "cardinality x m" shows "cardinality (setsucM x y)  (setsucM m m)"
-proof-
-  obtain f where "one_oneM f" "x = domM f" "m = rngM f" "natM m"
-    using \<open>cardinality x m\<close> unfolding cardinality_def set_equivalent_def by blast
-  let ?f = "setsucM f (\<langle>y,m\<rangle>)"
-  have "natM (setsucM m m)"
-    by (simp add: \<open>natM m\<close> nat_suc_nat)
-  have "setsucM x y = domM ?f"
-    using \<open>x = domM f\<close> unfolding setext dom_def' by auto
-  have "setsucM m m = rngM ?f"
-    using \<open>m = rngM f\<close> unfolding setext rng_def' by auto
-  have "relationM ?f"
-    unfolding relationM_def
-    using \<open>one_oneM f\<close> functionM_def one_oneM_def relationM_def by auto 
-  then have "functionM ?f"
-    unfolding functionM_def
-    using \<open>one_oneM f\<close> \<open>x = domM f\<close> \<open>\<not> y \<epsilon> x\<close> dom_def' funD one_oneD3 by auto 
-  then have "one_oneM ?f"
-    unfolding one_oneM_def 
-    using   \<open>\<not> y \<epsilon> x\<close> one_one_inj[OF \<open>one_oneM f\<close>] \<open>m = rngM f\<close> mem_not_refl[of m] 
-    rng_def'  by auto 
-  show ?thesis
-    unfolding cardinality_def set_equivalent_def 
-    using \<open>setsucM m m = rngM ?f\<close> \<open>natM (setsucM m m)\<close> \<open>one_oneM ?f\<close> \<open>setsucM x y = domM ?f\<close> by blast
-qed                                    
-
 end
 
 subsection \<open>Successor induction\<close> 
 
 text \<open>An important fragment of the theory of hereditarily finite sets. The finiteness principle used is the induction schema for set formulas.
- This route to axiomatizating ZFfin is developed in Vopěnka: Mathematics in the alternative set theory Vopenka1979.
+ This route to axiomatizating ZFfin is developed in Vopěnka: Mathematics in the alternative set theory \<open>Vopenka1979\<close>.
 Notice that no regularity principles are used in this fragment.\<close>
 
 locale L_setext_empty_setsuc_setind = L_setext + L_empty + L_setsuc + L_setind 
@@ -2642,6 +2678,9 @@ qed
 sublocale L_setext_empty_repl
   by unfold_locales
 
+sublocale L_setext_sep
+  by unfold_locales
+
 lemma setsuc_separ: assumes "y \<epsilon> u" 
   shows "u = setsucM (separationM u (\<lambda> x. x \<noteq> y)) y"
 proof-
@@ -2705,9 +2744,6 @@ proof (rule setind_SP[rule_format])
         (unfold binunion_def' setsuc_subset_setind, use z z' in simp)
   qed 
 qed
-
-
-\<comment> \<open>Axioms of ZF without infinity and regularity are theorems\<close>
 
 sublocale L_setext_empty_power_union_repl
   by unfold_locales
@@ -2810,8 +2846,7 @@ sublocale L_tarski
   by unfold_locales (simp add: tarski_fin_def, metis empty)  
 
 sublocale L_dedekind
-  by unfold_locales
-  (use setind_SP[rule_format, OF SP_dedekind empty_dedekind] dedekind_setsuc_dedekind in blast) 
+  unfolding L_dedekind_def  using SP_dedekind dedekind_setsuc_dedekind empty_dedekind setind_SP by blast 
     
 lemma fun_images: assumes "SetFormulaPredicate P" and "\<forall> u. (\<exists>! v. P(\<Xi>(0:=u,1:=v)))"
   shows "\<exists> z. (\<forall> v. v \<epsilon> z \<longleftrightarrow> (\<exists> u. u \<epsilon> x \<and> P(\<Xi>(0:=u,1:=v))))" 
@@ -2844,6 +2879,9 @@ proof-
       by (rule exI[of _ "setsucM z y'"]) (use witness in force) 
   qed
 qed
+
+sublocale L_setext_setsuc_sep
+  by unfold_locales
 
 sublocale L_fin
 proof (unfold_locales, rule notI)
@@ -2890,24 +2928,24 @@ proof (rule iffI)
 qed (use natM_def in blast)
 
 lemma ord_iff_empty_or_suc: "ordM x \<longleftrightarrow> x = \<emptyset> \<or> (\<exists> y. ordM y \<and> x = setsucM y y)"
-  by (metis emp_natM not_limit_ord ord_is_suc ord_iff_nat ord_suc_ord union_ord)
+  by (metis emp_natM empty_mem_ord fin natM_def ord_mem_ord_sep ord_mem_suc
+      ord_suc_ord) 
 
 lemma union_of_ords_mem:  assumes "\<forall> y. y \<epsilon> s \<longrightarrow> ordM y" "s \<noteq> \<emptyset>" 
   shows "\<Union>\<^sub>M s \<epsilon> s"
-  using \<open>s \<noteq> \<emptyset>\<close> emptyset_def' non_limit_union_ord_mem[OF assms(1)] ord_is_suc[OF union_of_ords_ord[OF assms(1)]]
+  using \<open>s \<noteq> \<emptyset>\<close> emptyset_def'  
+non_limit_union_ord_mem[OF assms(1)] ord_is_suc[OF union_of_ords_ord[OF assms(1)]]
     union_def' by metis
 
 end
 
 subsection \<open>Negation of inf\<close>
 
-text \<open>ZF with inf replaced by fin\<close>
-
-locale L_setext_empty_power_union_repl_reg_fin  = L_setext + L_empty + L_power + L_union + L_repl + L_reg + L_fin
+locale L_setext_empty_power_repl_fin  = L_setext + L_empty + L_power + L_repl +  L_fin
 
 begin
 
-sublocale L_setext_empty_power_union_repl_reg
+sublocale L_setext_empty_power_repl
   by unfold_locales
 
 sublocale L_setind
@@ -2916,37 +2954,74 @@ proof (unfold_locales, (rule impI)+, rule allI, rule ccontr)
   assume "SetFormulaPredicate P" "P (\<Xi> (0:= \<emptyset>))" and step:  "\<forall>x y. P (\<Xi> (0:= x)) \<longrightarrow> P ((\<Xi> (0:=setsucM x y)))" and "\<not> (P (\<Xi> (0:=x)))"
   have sfp: "SetFormulaPredicate (\<lambda> \<Xi>. cardinality (\<Xi> 0) (\<Xi> 1))"
     unfolding set_defs logsimps by (rule SFP_rules)+
-  have cinj: "cardinality u v \<and> cardinality u w \<Longrightarrow> v = w" for u v w
-    using card_fun by auto
   from sep[OF \<open>SetFormulaPredicate P\<close>, rule_format, of"\<PP> x" \<Xi>]
-  obtain s where s: "\<forall>u. (u \<epsilon> s) = (u \<epsilon> \<PP> x \<and> P (\<Xi>(0 := u)))"
+  obtain z where z: "\<forall>u. (u \<epsilon> z) = (u \<epsilon> \<PP> x \<and> P (\<Xi>(0 := u)))"
     by blast
-  from replp_vars[rule_format, OF sfp, of \<Xi> 0 1 s, simplified] 
-  obtain m where m: "\<forall>v. (v \<epsilon> m) = (\<exists>a. a \<epsilon> s \<and> cardinality a v) " 
-    using cinj by blast
+  have card_fun: "m = n" if  "cardinality x n" "cardinality x m" for m n x
+  proof-
+    have "ordM n" "ordM m" "natM n" "natM m"
+      using that by (simp_all add: cardinality_def natM_def) 
+    have nat_dfin:  "dedekind_fin x" if  "natM x" for x
+    proof (rule ccontr)
+      have sfp: "SetFormulaPredicate (\<lambda> \<Xi>. dedekind_fin  (\<Xi> 0))"
+        unfolding set_defs dedekind_fin_def logsimps by (rule SFP_rules)+
+      assume "\<not> dedekind_fin x" 
+      define v where "v = separationM x (\<lambda> x. dedekind_fin ((undefined(0:=x)) 0))"
+      from separ_def_SFP[OF sfp, of _ x undefined 0]
+      have v: "u \<epsilon> v \<longleftrightarrow> u \<epsilon> x \<and> dedekind_fin u" for u
+        unfolding v_def by simp 
+      hence "\<emptyset> \<epsilon> v"
+        using \<open>\<not> dedekind_fin x\<close> that empty_dedekind empty_mem_ord natM_D by blast 
+      have "(setsucM y y) \<epsilon> v" if "y \<epsilon> v" for y
+        using \<open>\<not> dedekind_fin x\<close> \<open>natM x\<close> dedekind_setsuc_dedekind natM_D ord_mem_suc \<open>y \<epsilon> v\<close> v by blast
+      thus False
+        using fin \<open>\<emptyset> \<epsilon> v\<close> by blast      
+    qed
+    have "n \<approx>\<^sub>M m" "m \<approx>\<^sub>M n"
+      using that cardinality_def set_equivalent_sym set_equivalent_trans by metis+
+    have "regular n" "regular m"
+      using that by (simp_all add: natM_def cardinality_def)  
+    have "\<not> n \<epsilon> m"    
+      using nat_dfin[OF \<open>natM m\<close>, unfolded dedekind_fin_def, rule_format, of n] \<open>m \<approx>\<^sub>M n\<close>
+        ordM_D1[OF\<open>ordM m\<close>, of n, THEN  proper_subsetI] regular_not_self_mem_sep[OF \<open>regular n\<close>] by metis 
+    have "\<not> m \<epsilon> n"
+      using nat_dfin[OF \<open>natM n\<close>, unfolded dedekind_fin_def, rule_format, of m] \<open>n \<approx>\<^sub>M m\<close>
+        ordM_D1[OF\<open>ordM n\<close>, of m, THEN  proper_subsetI] regular_not_self_mem_sep[OF \<open>regular m\<close>] by metis 
+    show "m = n"
+      by (meson \<open>\<not> m \<epsilon> n\<close> \<open>\<not> n \<epsilon> m\<close> that cardinality_def natM_def ordM_total) 
+  qed    
+  from replp_vars[rule_format, OF sfp, of \<Xi> 0 1 z, simplified]
+  obtain m where m: "\<forall>v. (v \<epsilon> m) = (\<exists>a. a \<epsilon> z \<and> cardinality a v) " 
+    using card_fun  by blast
   have "\<emptyset> \<epsilon> m"
     using card_emp exI[of "\<lambda> x. x \<subseteq>\<^sub>M x \<and> P (\<Xi> (0:=x, 1:=\<emptyset>)) \<and> cardinality x \<emptyset>" \<emptyset>] \<open>P (\<Xi> (0:=\<emptyset>))\<close> 
-    unfolding m[rule_format] powerset_def' subsetM_def s[rule_format]
+    unfolding m[rule_format] powerset_def' subsetM_def z[rule_format]
     using emptyset_def'  by auto 
   have "setsucM n n \<epsilon> m" if "n \<epsilon> m" for n
   proof-                  
     obtain y where "y \<epsilon> \<PP> x" "cardinality y n" "P (\<Xi> (0:=y))"
-      using m  \<open>n \<epsilon> m\<close> s by fast
+      using m  \<open>n \<epsilon> m\<close> z by fast
     obtain y' where "y' \<epsilon> x" "\<not> y' \<epsilon> y" 
       using \<open>y \<epsilon> \<PP> x\<close> \<open>P (\<Xi> (0:=y))\<close> \<open>\<not> P (\<Xi> (0:=x))\<close> subsetM_antisym powerset_def' subsetM_def by blast
     show "setsucM n n \<epsilon> m"
       unfolding m[rule_format] 
     proof (rule exI[of _ "setsucM y y'"])  
-      show "setsucM y y' \<epsilon> s \<and> cardinality (setsucM y y') (setsucM n n)"
-        using card_setsuc[OF \<open>\<not> y' \<epsilon> y\<close> \<open>cardinality y n\<close>] \<open>y \<epsilon> \<PP> x\<close> \<open>y' \<epsilon> x\<close>  
-          step[rule_format, OF \<open>P (\<Xi>(0:= y))\<close>] unfolding powerset_def' subsetM_def s[rule_format] by simp
+      have "setsucM y y' \<epsilon> z"
+        unfolding z[rule_format]
+        using step[rule_format, OF \<open>P (\<Xi>(0:= y))\<close>]   \<open>y' \<epsilon> x\<close> \<open>y \<epsilon> \<PP> x\<close>
+        by (simp add: powerset_def' subsetM_def) 
+      then show "setsucM y y' \<epsilon> z \<and> cardinality (setsucM y y') (setsucM n n)"
+        using card_setsuc[OF \<open>\<not> y' \<epsilon> y\<close> \<open>cardinality y n\<close>] by blast
     qed 
   qed
   then show False
     using fin \<open>\<emptyset> \<epsilon> m\<close> by blast
 qed
 
-lemma cardinality_ex: "\<exists>! n. natM n \<and> x \<approx>\<^sub>M n"
+sublocale L_setext_empty_setsuc_setind
+  by unfold_locales
+
+lemma card_ex: "\<exists>! n. natM n \<and> x \<approx>\<^sub>M n"
 proof (rule ex_ex1I)
   show "\<exists> n. natM n \<and> x \<approx>\<^sub>M n"
   proof (rule setind_SP[rule_format])
@@ -2959,21 +3034,21 @@ proof (rule ex_ex1I)
   qed
   show "natM n \<and> x \<approx>\<^sub>M n \<Longrightarrow> natM y \<and> x \<approx>\<^sub>M y \<Longrightarrow> n = y" for n x y
     using nat_equiv_unique set_equivalent_sym set_equivalent_trans by blast
-qed
-
-sublocale L_setext_empty_setsuc_setind
-  by unfold_locales
+qed   
 
 end
 
 subsection \<open>Dedekind finite\<close>
 
-locale L_setext_empty_power_union_repl_dedekind = L_setext + L_empty + L_power + L_union + L_repl + L_dedekind
+locale L_setext_empty_power_repl_dedekind = L_setext + L_empty + L_power + L_repl + L_dedekind
 
 begin
 
-sublocale L_setext_empty_power_union_repl
+sublocale L_setext_empty_power_repl
   by unfold_locales  
+
+sublocale L_setext_setsuc_sep
+  by unfold_locales
 
 sublocale L_fin
 proof (unfold_locales, rule notI)
@@ -2986,13 +3061,14 @@ proof (unfold_locales, rule notI)
     unfolding x_def. 
   have x_setsuc: "u \<epsilon> x \<longrightarrow> setsucM u u \<epsilon> x" for u
     using x'(2) nat_suc_nat[of u] unfolding x by blast 
-  have "SetFormulaPredicate (\<lambda> \<Xi>. \<exists> v. \<Xi> 0 = \<langle>v,setsucM v v\<rangle>)"
-    unfolding logsimps set_defs by (rule SFP_rules)+ 
-  from sep[OF this, rule_format, of "x \<times>\<^sub>M x", simplified]
-  obtain f where "u \<epsilon> f \<longleftrightarrow> (u \<epsilon> x \<times>\<^sub>M x  \<and> (\<exists>v. u = \<langle>v,setsucM v v\<rangle>))" for u
-    by blast
-  hence f: "u \<epsilon> f \<longleftrightarrow> (\<exists> v. v \<epsilon> x \<and> u = \<langle>v,setsucM v v\<rangle>)" for u
-    using car_prod_def' x_setsuc by auto
+  let ?P = "(\<lambda> (\<Xi> :: nat \<Rightarrow> 'a). \<Xi> 1 = \<langle>\<Xi> 0,setsucM (\<Xi> 0) (\<Xi> 0)\<rangle>)"
+  have sfp: "SetFormulaPredicate ?P"
+    unfolding logsimps set_defs setext by (rule SFP_rules)+  
+  have func: "\<forall> u v w. ?P (undefined (0 := u, 1 := v)) \<and> ?P (undefined (0 := u, 1 := w)) \<longrightarrow> v = w"
+    by simp
+  from replp[OF sfp func, rule_format, of x, simplified]
+  obtain f where f: "u \<epsilon> f \<longleftrightarrow> (\<exists>v. v \<epsilon> x  \<and> u = \<langle>v,setsucM v v\<rangle>)" for u
+    by blast 
   have "one_oneM f"
    by (rule one_oneI, unfold f x, blast, unfold ordered_pair_unique)  
     (use ord_pred_fun[OF natM_D natM_D] in blast)+ 
@@ -3010,7 +3086,8 @@ proof (unfold_locales, rule notI)
       have t: "\<emptyset> \<epsilon> x = True"
         by (simp add: x x'(1))
       have f: "(\<exists> v. \<langle>v,\<emptyset>\<rangle> \<epsilon> f) = False"
-        unfolding f ordered_pair_unique setext[of \<emptyset>] binunion_def' singleton_def' by force
+        by (metis f
+            empty_is_empty ordered_pair_unique setsuc_def')
       show "(\<exists>v. \<langle>v,\<emptyset>\<rangle> \<epsilon> f) \<noteq> (\<emptyset> \<epsilon> x)"
         unfolding t f by blast
     qed
@@ -3073,21 +3150,13 @@ qed
 sublocale L_setext_empty_setsuc_setind
   by unfold_locales 
 
-text \<open>It follows in particular that union and replacement are provable in this context.\<close>
-
-sublocale L_repl
-  by unfold_locales
-
-sublocale L_union
-  by unfold_locales
-
 end
 
 subsection \<open>Set induction and regularity schema\<close>
 
 text \<open>An apparently minor variation of the set induction schema, 
 which nevertheless yields also the schema of regularity (i.e., epsilon induction). 
-It is used in Pudlák and Sochor PudlakSochor1984.\<close>
+It is used in Pudlák and Sochor \<open>PudlakSochor1984\<close>.\<close>
 
 locale L_setindregsch = set_signature +
   assumes setindregsch: "SetFormulaPredicate P \<Longrightarrow> 
@@ -3156,11 +3225,12 @@ proof-
 
 \<comment> \<open>Epsilon induction (and hence, regularity schema) is a theorem.\<close>
 
-lemma epsind_from_setindregsch: assumes sfp: "SetFormulaPredicate P" and indp: "(\<forall> x. (\<forall>y. (y \<epsilon> x \<longrightarrow> P(\<Xi>(0:=y))))  \<longrightarrow>  P(\<Xi>(0:=x)))"
-  shows "\<forall> x. P(\<Xi>(0:=x))"
-proof
-  fix x
-  from bounded_free[OF \<open>SetFormulaPredicate P\<close>]
+sublocale L_epsind
+proof (unfold_locales, rule impI, rule allI)
+  fix P \<Xi> x
+  assume "SetFormulaPredicate P" and 
+    indp: " \<forall>x. (\<forall>y. y \<epsilon> x \<longrightarrow> P (\<Xi>(0 := y))) \<longrightarrow> P (\<Xi>(0 := x))" 
+  from bounded_free[OF this(1)]
   obtain m where "\<forall>\<Xi> \<Xi>'. (\<forall>i<m. \<Xi> i = \<Xi>' i) \<longrightarrow> P \<Xi> = P \<Xi>'"
     by blast
   then have small: "P(\<Xi>(Suc m:=a, 0:= u)) = P(\<Xi>(0:= u))" for \<Xi> a u
@@ -3168,86 +3238,29 @@ proof
   let ?Q = "\<lambda> \<Xi>. \<forall> u. (u \<epsilon> (\<Xi> (Suc m)) \<longrightarrow> P(\<Xi>(0:=u)))"
   have sfpQ: "SetFormulaPredicate ?Q"
     by (rule SFP_all[of "\<lambda> \<Xi>. (\<Xi> 0) \<epsilon> (\<Xi> (m+1)) \<longrightarrow> P \<Xi>" 0, simplified])
-    (unfold logsimps set_defs, (rule | fact)+)
+      (unfold logsimps set_defs, (rule | fact)+)
   thm setindregsch_var[OF \<open>SetFormulaPredicate ?Q\<close>, of _ "Suc m", unfolded small, simplified]
   have "?Q (\<Xi> (0:=v))  \<and> ?Q (\<Xi> (0:=w)) \<longrightarrow> ?Q (\<Xi> (0:=(v\<union>\<^sub>M{w}\<^sub>M)))" for v w \<Xi> 
-   \<comment>\<open>use ?Q w and indp to show P w\<close>
+    \<comment>\<open>use ?Q w and indp to show P w\<close>
     unfolding setsuc_def' using indp[rule_format] by simp
   from setindregsch_var[OF \<open>SetFormulaPredicate ?Q\<close>, of _ "Suc m", unfolded small, simplified]
   have " ?Q (\<Xi>(Suc m:= x))"
     unfolding small fun_upd_same using indp by metis
   then show "P (\<Xi>(0 := x))"
-     using indp unfolding small fun_upd_same by blast 
- qed
-
-sublocale L_epsind
-  by (unfold_locales) (use epsind_from_setindregsch in blast)
-
-sublocale L_setext_empty_union_repl_pair_regsch
-  by unfold_locales
+    using indp unfolding small fun_upd_same by blast 
+qed
 
 end
 
-subsection \<open>Summary of dependencies\<close>
+text \<open>In turn, the variation of set induction which combines it with regularity schema is provable from set induction schema and epsilon induction 
+(i.e., regularity schema). Taken for granted in  \<open>PudlakSochor1984\<close>.\<close>
 
-theorem epsind_regsch_iff:
-  "L_epsind mem \<longleftrightarrow> L_regsch mem"
-proof
-  assume "L_epsind mem"
-  from L_epsind.epsind_regsch[OF this]
-  show "L_regsch mem"
-    by unfold_locales blast
-next
-  assume "L_regsch mem"
-  from L_regsch.regsch_epsind[OF this]
-  show "L_epsind mem"
-    by unfold_locales
-qed
-
-text \<open>We give additional names to some important collections of axioms.
-Here is a "canonical" axiomatization of the theory of hereditarily finite sets.\<close>
-
-locale ZFfin =  L_setext + L_empty + L_power + L_union +  L_repl + L_fin + L_epsind
-
-begin
-sublocale L_setext_empty_power_union_repl_reg_fin
-  by unfold_locales
-sublocale L_regsch
-  by unfold_locales
-sublocale L_reg
-  by unfold_locales
-sublocale L_setsuc
-  by unfold_locales
-sublocale L_sep
-  by unfold_locales
-sublocale L_setind
-  by unfold_locales
-sublocale L_dedekind
-  by unfold_locales
-sublocale L_tarski
-  by unfold_locales
-end
-
-text \<open>This is the list of axioms for sets from Vopěnka's book.\<close>
-
-locale ASTset = L_setext + L_empty + L_setsuc + L_setind + L_regsch
+locale L_setext_setsuc_setind_epsind = L_setext + L_setsuc +  L_setind + L_epsind
 
 begin
 
-text \<open>Vopěnka shows that all axioms of @{term ZFfin} are provable in @{term ASTset}\<close>
-
-sublocale ZFfin
-proof-
-  interpret L_setext_empty_setsuc_setind
-    by unfold_locales
-  interpret L_epsind
-    by (simp add: L_regsch_axioms epsind_regsch_iff) 
-  show "ZFfin (\<epsilon>)"
-    by unfold_locales
-qed
-
-text \<open>The variation of set induction which combines it with regularity schema is provable from set induction schema and epsilon induction 
-(i.e., regularity schema). Taken for granted in  PudlakSochor1984.\<close>
+sublocale L_setext_setsuc
+  by unfold_locales
 
 sublocale L_setindregsch
 proof (unfold_locales, rule impI, rule impI, rule allI)
@@ -3313,27 +3326,82 @@ qed
 
 end
 
+subsection \<open>Summary of dependencies\<close>
+
+theorem epsind_regsch_iff:
+  "L_epsind mem \<longleftrightarrow> L_regsch mem"
+proof
+  assume "L_epsind mem"
+  then interpret L_epsind mem.
+  show "L_regsch mem"
+    by unfold_locales
+next
+  assume "L_regsch mem"
+  then interpret L_regsch mem.
+  show "L_epsind mem"
+    by unfold_locales
+qed
+
+text \<open>We give additional names to some important collections of axioms.
+Here is a "canonical" axiomatization of the theory of hereditarily finite sets.\<close>
+
+locale ZFfin =  L_setext + L_empty + L_power + L_repl + L_fin + L_epsind
+
+begin
+sublocale L_setext_empty_power_repl_fin
+  by unfold_locales
+lemma "L_regsch (\<epsilon>)"
+  by unfold_locales
+lemma "L_reg (\<epsilon>)"
+  by unfold_locales
+lemma "L_setsuc (\<epsilon>)"
+  by unfold_locales
+lemma "L_sep (\<epsilon>)"
+  by unfold_locales
+lemma "L_union (\<epsilon>)"
+  by unfold_locales
+lemma "L_setind (\<epsilon>)"
+  by unfold_locales
+lemma "L_dedekind (\<epsilon>)"
+  by unfold_locales
+lemma "L_tarski (\<epsilon>)"
+  by unfold_locales
+end
+
+text \<open>This is the list of axioms for sets from Vopěnka's book \<open>Vopenka1979\<close>.\<close>
+
+locale ASTset = L_setext + L_empty + L_setsuc + L_setind + L_regsch
+
+begin
+
+text \<open>Vopěnka \<open>Vopenka1979\<close> shows that all axioms of @{term ZFfin} are provable in @{term ASTset}\<close>
+
+sublocale L_setext_empty_setsuc_setind
+    by unfold_locales
+
+sublocale ZFfin
+  by unfold_locales
+
+sublocale L_setext_setsuc_setind_epsind
+  by unfold_locales
+
+end
+
 text \<open>\<open>ZFfin\<close> and \<open>ASTset\<close> are two different axiomatizations of the same theory.\<close>
 
 sublocale ASTset \<subseteq> ZFfin
   by unfold_locales
 sublocale ZFfin \<subseteq> ASTset
-  by (simp add: ASTset_def L_empty_axioms L_regsch_axioms L_setext_axioms L_setind_axioms L_setsuc_axioms)
-  
-text \<open>In the AST, set induction and epsilon induction (i.e., regularity schema) can be replaced by the variant \<open>setindregsch\<close>\<close>
+  by unfold_locales
 
-theorem setindregsch_ast: "L_setext_empty_setsuc_setindregsch mem \<longleftrightarrow> ASTset mem"
-proof
-  assume "L_setext_empty_setsuc_setindregsch mem"
-  then interpret  L_setext_empty_setsuc_setindregsch "mem".
-  show "ASTset mem"
-    by unfold_locales
-next
-  assume "ASTset mem"
-  then interpret  ASTset "mem".
-  show "L_setext_empty_setsuc_setindregsch mem"
-    by unfold_locales
-qed  
+text \<open>Another equivalent axiomatization given by the fact that, in the AST, set induction and epsilon induction (i.e., regularity schema) can be replaced by the variant \<open>setindregsch\<close>\<close>
+
+sublocale ASTset \<subseteq> L_setext_empty_setsuc_setindregsch
+  by unfold_locales
+sublocale L_setext_empty_setsuc_setindregsch \<subseteq> ASTset
+  by unfold_locales
+
+text \<open>Formulation of the above as theorems.\<close>
 
 theorem zffin_ast: "ZFfin mem \<longleftrightarrow> ASTset mem"
 proof
@@ -3348,6 +3416,19 @@ next
     by unfold_locales
 qed  
 
+theorem setindregsch_ast: "L_setext_empty_setsuc_setindregsch mem \<longleftrightarrow> ASTset mem"
+proof
+  assume "L_setext_empty_setsuc_setindregsch mem"
+  then interpret  L_setext_empty_setsuc_setindregsch "mem".
+  show "ASTset mem"
+    by unfold_locales
+next
+  assume "ASTset mem"
+  then interpret  ASTset "mem".
+  show "L_setext_empty_setsuc_setindregsch mem"
+    by unfold_locales
+qed  
+
 text \<open>Ambivalence of the separation schema and the replacement schema.\<close>
 
 theorem repl_implies_sep:
@@ -3359,7 +3440,7 @@ proof-
     by unfold_locales
 qed
 
-text \<open>Under certain finiteness assumptions, separation entails replacement. See Behounek1998 for details.\<close>
+text \<open>Under certain finiteness assumptions, separation entails replacement. See \<open>Behounek1998\<close> for details.\<close>
 
 theorem sep_implies_repl:
   shows "L_setext_empty_power_sep_setsuc_tarski mem \<Longrightarrow> L_repl mem"
@@ -3372,7 +3453,7 @@ qed
 
 text \<open>Entailment between different finiteness principles, in their natural contexts.\<close>
 
-text \<open>The following is included in Vopěnka Vopenka1979 by exploring the consequences of induction for set formulas.\<close>
+text \<open>The following is included in Vopěnka \<open>Vopenka1979\<close> by exploring the consequences of induction for set formulas.\<close>
 
 theorem (in L_setext_empty_setsuc) 
   shows setind_implies_tarski: "L_setind (\<epsilon>) \<Longrightarrow> L_tarski (\<epsilon>)" and
@@ -3388,65 +3469,65 @@ proof-
     by unfold_locales
 qed    
 
-theorem (in L_setext_empty_power_union_repl)
-   dedekind_implies_fin: "L_dedekind (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)"
-proof-
-  assume "L_dedekind (\<epsilon>)"
-  then interpret L_dedekind.
-  interpret L_setext_empty_power_union_repl_dedekind
-    by unfold_locales
-  show "L_fin (\<epsilon>)"
-    by (simp add: L_fin_axioms)
-qed
-
 text \<open>Equivalence of finiteness principles, in sufficiently strong common context.\<close>
 
-theorem (in L_setext_empty_power_union_repl_reg)
-        fin_implies_tarski: "L_fin (\<epsilon>) \<Longrightarrow> L_tarski (\<epsilon>)" and
-        tarski_implies_fin: "L_tarski (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)" and
-        fin_implies_setind: "L_fin (\<epsilon>) \<Longrightarrow> L_setind (\<epsilon>)" and
-        setind_implies_fin: "L_setind (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)" and
-        fin_implies_dedekind: "L_fin (\<epsilon>) \<Longrightarrow> L_dedekind (\<epsilon>)"
+theorem (in L_setext_empty_power_repl)
+        fin_equiv_tarski: "L_fin (\<epsilon>) \<longleftrightarrow> L_tarski (\<epsilon>)" and
+        fin_equiv_setind: "L_fin (\<epsilon>) \<longleftrightarrow> L_setind (\<epsilon>)" and
+        fin_equiv_dedekind: "L_fin (\<epsilon>) \<longleftrightarrow> L_dedekind (\<epsilon>)" 
 proof-
-  assume "L_fin (\<epsilon>)"
-  then interpret L_fin "(\<epsilon>)". 
-  interpret L_setext_empty_power_union_repl_reg_fin "(\<epsilon>)"
-     by unfold_locales 
-  interpret L_setext_empty_setsuc_setind "(\<epsilon>)"
-     by unfold_locales 
-  show "L_tarski (\<epsilon>)" 
-    by unfold_locales 
-  show "L_dedekind (\<epsilon>)" 
-    by unfold_locales 
-  show "L_setind (\<epsilon>)" 
-    by unfold_locales 
-next
-  assume "L_tarski (\<epsilon>)"
-  then interpret L_tarski "(\<epsilon>)". 
-  interpret L_setext_empty_power_sep_setsuc_tarski
-     by unfold_locales 
-  show "L_fin (\<epsilon>)" 
-    by unfold_locales 
-next
-  assume "L_setind (\<epsilon>)" 
-  then interpret L_setind "(\<epsilon>)"
-    by blast
-  interpret L_setsuc "(\<epsilon>)"
-    by unfold_locales 
-  interpret L_setext_empty_setsuc "(\<epsilon>)"
-    by unfold_locales
-  from setind_implies_tarski[OF \<open>L_setind (\<epsilon>)\<close>]  
-  interpret L_tarski "(\<epsilon>)".
-  interpret L_setext_empty_power_sep_setsuc_tarski "(\<epsilon>)"
-     by unfold_locales 
-  show "L_fin (\<epsilon>)"
-    by unfold_locales 
+  have fin_tarski: "L_fin (\<epsilon>) \<Longrightarrow> L_tarski (\<epsilon>)" and fin_setind: "L_fin (\<epsilon>) \<Longrightarrow> L_setind (\<epsilon>)" and fin_dedekind: "L_fin (\<epsilon>) \<Longrightarrow> L_dedekind (\<epsilon>)"
+  proof-
+    assume "L_fin (\<epsilon>)"
+    then interpret L_fin "(\<epsilon>)". 
+    interpret L_setext_empty_power_repl_fin "(\<epsilon>)"
+      by unfold_locales 
+    interpret L_setext_empty_setsuc_setind "(\<epsilon>)"
+      by unfold_locales 
+    show "L_tarski (\<epsilon>)" 
+      by unfold_locales 
+    show "L_dedekind (\<epsilon>)" 
+      by unfold_locales 
+    show "L_setind (\<epsilon>)" 
+      by unfold_locales 
+  qed
+  have tarski_fin: "L_tarski (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)"
+  proof-
+    assume "L_tarski (\<epsilon>)"
+    then interpret L_tarski "(\<epsilon>)". 
+    interpret L_setext_empty_power_sep_setsuc_tarski
+      by unfold_locales 
+    show "L_fin (\<epsilon>)" 
+      by unfold_locales 
+  qed
+  have setind_fin: "L_setind (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)"
+  proof-
+    assume "L_setind (\<epsilon>)"
+    then interpret L_setind "(\<epsilon>)". 
+    interpret L_setext_empty_setsuc_setind
+      by unfold_locales 
+    show "L_fin (\<epsilon>)" 
+      by unfold_locales 
+  qed
+  have dedekind_fin: "L_dedekind (\<epsilon>) \<Longrightarrow> L_fin (\<epsilon>)"
+  proof-
+    assume "L_dedekind (\<epsilon>)"
+    then interpret L_dedekind "(\<epsilon>)". 
+    interpret L_setext_empty_power_repl_dedekind "(\<epsilon>)"
+      by unfold_locales 
+    show "L_fin (\<epsilon>)" 
+      by unfold_locales 
+  qed
+  show "L_fin (\<epsilon>) \<longleftrightarrow> L_tarski (\<epsilon>)" 
+       "L_fin (\<epsilon>) \<longleftrightarrow> L_setind (\<epsilon>)"
+       "L_fin (\<epsilon>) \<longleftrightarrow> L_dedekind (\<epsilon>)"
+    by (rule, fact+)+
 qed
 
 text \<open>The validity of the regularity schema/epsilon induction is closely related to the existence of a transitive superset
-See also Proposition 5.4, Kaye and Wong, 2007.
+See also Proposition 5.4, Kaye and Wong \<open>KayeWong2007\<close>.
 There, the equivalence of \<open>L_epsind\<close> and  \<open>L_ts\<close> is shown in the context of EST + regularity. 
-Instead, we follow  Sochor 1979 and 1982 
+Instead, we follow  Sochor  \<open>Sochor1979\<close> and \<open>Sochor1982\<close> 
 in improving the claim by weakening both implications.  
 \<close>
 
@@ -3460,7 +3541,7 @@ proof-
   interpret L_regsch
     by unfold_locales
   show "L_epsind (\<epsilon>)"
-    using L_epsind_def regsch_epsind by blast
+    using L_epsind_def epsind by blast
 qed
 
 theorem  (in L_setext_empty_union_repl_pair) epsind_implies_ts: 
@@ -3475,7 +3556,7 @@ proof-
 qed
 
 text \<open>Consequently, in a sufficiently strong context we can verify the equivalence of axioms  A81 (regularity) + A82 (transitive superset) and A8 (schema of regularity)
-from Sochor 1979, p. 709.
+from Sochor \<open>Sochor1979\<close>, p. 709.
 \<close>
 
 theorem  (in L_setext_empty_union_repl_pair) ts_reg_iff_regsch: 

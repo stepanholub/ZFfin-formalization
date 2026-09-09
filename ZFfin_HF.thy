@@ -11,7 +11,9 @@ begin
 section \<open>Hereditarily finite sets\<close>
 
 text \<open>We show that the hereditarily finite sets as implemented in @{theory HereditarilyFinite.HF} are a model of 
- ZFfin as implemented in ZFfin}\<close>
+ ZFfin as implemented in \<open>ZFfin\<close>\<close>
+
+find_theorems name: nat_induction_sfp
 
 interpretation zfhf: ZFfin "(\<^bold>\<in>)"
   rewrites "zfhf.emptysetM = 0" and

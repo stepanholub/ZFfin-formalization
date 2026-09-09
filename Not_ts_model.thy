@@ -16,11 +16,11 @@ Consequently, \<open>0\<close> (the empty set) has not transitive superset, sinc
 As a corollary, the permutation model does not satisfy schema of regularity (or, equivalently, epsilon induction) 
 since it entails transitive superset axiom.
 
-The construction is given in Rieger in Rieger1957 and also in ManciniZambella2001 who underscore that the model is recursive. 
-The statement that regularity schema does not follow from regularity was also proved in VopenkaHajek1963.
+The construction is given in Rieger in \<open>Rieger1957\<close> and also in \<open>ManciniZambella2001\<close> who underscore that the model is recursive. 
+The statement that regularity schema does not follow from regularity was also proved in \<open>VopenkaHajek1963\<close>.
 \<close>
 
-context L_setext_empty_power_union_repl_reg
+context L_setext_empty_power_repl_reg
 
 begin
 
@@ -102,12 +102,15 @@ qed
 
 end
 
-context  L_setext_empty_power_union_repl_reg_fin
+locale  L_setext_empty_power_union_repl_reg_fin = L_setext_empty_power_repl_fin + L_reg
 
 begin  
 
+sublocale  L_setext_empty_power_repl_reg
+  by unfold_locales
+
 interpretation perm: permutation_model "(\<epsilon>)" regperm
-  by unfold_locales (use regperm_bij SR_regperm_mem in blast)+  
+  by unfold_locales  (use regperm_bij SR_regperm_mem in blast)+  
 
 \<comment> \<open>membership in the model\<close>
 abbreviation fmem (infix "\<epsilon>\<^sup>f" 51)  where 
@@ -133,6 +136,84 @@ proof-
   ultimately show ?thesis
     unfolding wfp_iff_ex_minimal by metis
 qed
+
+lemma perm_empty: "fm.emptysetM = {{\<emptyset>}\<^sub>M}\<^sub>M"
+proof (rule sym, unfold fm.emptyset_def') 
+  have "regperm ({{\<emptyset>}\<^sub>M}\<^sub>M) = \<emptyset>"
+    using regperm_image_plus[OF emp_natM] unfolding setsuc_empty_sing.
+  show "\<forall>u. \<not> u \<epsilon> (regperm ({{\<emptyset>}\<^sub>M}\<^sub>M))"
+    unfolding \<open>regperm ({{\<emptyset>}\<^sub>M}\<^sub>M) = \<emptyset>\<close> by (fact empty_is_empty) 
+qed
+
+lemma perm_one: "fm.binunionM fm.emptysetM (fm.singletonM fm.emptysetM) = {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M"
+proof-
+  have L: "z \<epsilon>\<^sup>f fm.binunionM fm.emptysetM (fm.singletonM fm.emptysetM) \<longleftrightarrow> z = fm.emptysetM" for z
+    unfolding fm.setext fm.binunion_def' fm.singleton_def'
+    using fm.nemp_setI fm.setsuc_def' by blast 
+  have "z \<epsilon>\<^sup>f {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<longleftrightarrow> z \<epsilon> {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M" for z
+    using singleton_def' binunion_emp nat_mem_nat nat_suc_nat
+        regperm_image_else[of "{{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M"] suc_sing_not_nat[of \<emptyset>] unfolding setsuc_empty_sing  by metis 
+  hence R: "z \<epsilon>\<^sup>f {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<longleftrightarrow> z = fm.emptysetM" for z
+    unfolding perm_empty singleton_def'.   
+  show ?thesis 
+    unfolding fm.setext L R by blast
+qed
+
+lemma perm_else_setsuc_else: assumes "\<not> natM u" "\<nexists> b. natM b \<and> u = {setsucM b b}\<^sub>M"
+  shows "\<not> natM (setsucM u u)" "\<nexists> b. natM b \<and> setsucM u u = {setsucM b b}\<^sub>M"
+  using assms by (meson nat_mem_nat setsuc_def') (metis mem_not_refl singleton_def' setsuc_def')   
+
+lemma perm_setsuc: assumes "\<not> natM u" "\<nexists> b. natM b \<and> u = {setsucM b b}\<^sub>M"
+  shows "fm.setsucM u u = setsucM u u"
+  unfolding fm.setext unfolding fm.binunion_def' regperm_image_else[OF perm_else_setsuc_else[OF assms]] 
+  regperm_image_else[OF assms]  singleton_def' fm.singleton_def' setsuc_def'
+  using \<open>regperm u = u\<close> fm.setsuc_def' by auto 
+
+lemma perm_fin: "L_fin (\<epsilon>\<^sup>f)"
+proof(unfold_locales, rule notI)
+  assume "\<exists>x. fm.emptysetM \<epsilon>\<^sup>f x \<and> (\<forall>y. y \<epsilon>\<^sup>f x \<longrightarrow> fm.setsucM y y \<epsilon>\<^sup>f x)"
+  then obtain x where xf: "fm.emptysetM \<epsilon>\<^sup>f x" "\<forall>y. y \<epsilon>\<^sup>f x \<longrightarrow> fm.setsucM y y \<epsilon>\<^sup>f x"
+    by blast   
+  hence mem0: "{{\<emptyset>}\<^sub>M}\<^sub>M \<epsilon>\<^sup>f x" 
+    using perm_empty by force
+  from xf(2)[rule_format, OF xf(1), unfolded perm_one] 
+  have mem1: "{{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<epsilon>\<^sup>f x"
+    using fm.binunion_emp fm.setsuc_empty_sing perm_one by force
+  hence not1: "\<not> natM x"
+    using mem0 by (metis mem_neq_singleton regperm_mem_nat) 
+  have not2: "\<nexists>b. natM b \<and> x = {setsucM b b}\<^sub>M"
+    using mem0 mem1
+    using binunion_emp nat_mem_nat regperm_image_plus suc_sing_not_nat setsuc_empty_sing by metis
+  from regperm_image_else[OF not1 not2]
+  have x: "{{\<emptyset>}\<^sub>M}\<^sub>M \<epsilon> x" "\<forall>y. y \<epsilon> x \<longrightarrow> fm.setsucM y y \<epsilon> x"
+    using xf perm_empty by force+
+  let ?P = "\<lambda> u. (\<not> natM u \<and> (\<nexists> b. natM b \<and> (u = {setsucM b b}\<^sub>M)))"
+  have sp: "SetProperty ?P"
+    unfolding SetProperty_def set_defs logsimps by (rule SFP_rules)+
+  from sep_SP[OF this, rule_format, of x]
+  obtain x' where x': "\<forall>u. (u \<epsilon> x') = (u \<epsilon> x \<and> \<not> natM u \<and> (\<nexists>b. natM b \<and> u = {setsucM b b}\<^sub>M))"
+    by blast
+  have "{{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<epsilon> x'"
+    using mem1  unfolding x'[rule_format] \<open>regperm x = x\<close>
+    using binunion_emp nat_mem_nat nat_suc_nat singleton_def' suc_sing_not_nat setsuc_empty_sing by metis 
+  hence "x' \<noteq> \<emptyset>"
+    by force
+  have x'_setsuc: "setsucM u u \<epsilon> x'" if "u \<epsilon> x'" for u
+    unfolding x'[rule_format]
+  proof(unfold conj_assoc[symmetric], rule conjI, rule conjI)  
+    note u = \<open>u \<epsilon> x'\<close>[unfolded x'[rule_format]]
+    have red: "fm.setsucM u u = setsucM u u"
+      by (rule perm_setsuc)
+      (use  \<open>u \<epsilon> x'\<close>[unfolded x'[rule_format]] in blast)+
+    show "setsucM u u \<epsilon> x"
+      by (rule  x(2)[rule_format, of u, unfolded red]) (simp add: u)
+    show "\<not> natM (setsucM u u)" "\<nexists>b. natM b \<and> setsucM u u = {setsucM b b}\<^sub>M"
+      using u perm_else_setsuc_else by blast+
+  qed
+  with max_subset_ex[OF \<open>x' \<noteq> \<emptyset>\<close>]
+  show False
+    using suc_subset by blast
+qed     
 
 text \<open>The main meta-theorem. The axiom of the transitive superset does not hold in the model 
 since the transitive closure of \<open>\<emptyset>\<close> would be an infinite set.\<close>
@@ -208,11 +289,11 @@ proof
       proof (cases) 
         assume "y = \<emptyset>"
         then show ?thesis 
-          using one_in_t[unfolded tmem] setsuc_empty_sing tnat unfolding binunion_def' by simp 
+          using one_in_t[unfolded tmem] setsuc_empty_sing tnat  by simp 
       next
         assume "y \<epsilon> tnatM"
         then show ?thesis 
-          unfolding tnat  binunion_def' setsuc_def'  using   suc_t[unfolded tmem, of y] nat_suc_nat[of y] by blast
+          unfolding tnat setsuc_def'  using   suc_t[unfolded tmem, of y] nat_suc_nat[of y] by blast
       qed
     qed
   qed
@@ -223,7 +304,7 @@ theorem regperm_not_regsch: "\<not> L_regsch (\<epsilon>\<^sup>f)"
     using regperm_not_ts epsind_regsch_iff fm.epsind_implies_ts by blast 
 
 lemma regperm_reg:
-  shows "L_setext_empty_power_union_repl_reg (\<epsilon>\<^sup>f)"
+  shows "L_setext_empty_power_repl_reg (\<epsilon>\<^sup>f)"
 proof (unfold_locales, rule allI, rule impI) 
   fix a
   assume "\<exists>y. y \<epsilon>\<^sup>f a"
@@ -284,87 +365,6 @@ proof (unfold_locales, rule allI, rule impI)
   qed
 qed
 
-lemma perm_empty: "fm.emptysetM = {{\<emptyset>}\<^sub>M}\<^sub>M"
-proof (rule sym, unfold fm.emptyset_def') 
-  have "regperm ({{\<emptyset>}\<^sub>M}\<^sub>M) = \<emptyset>"
-    using regperm_image_plus[OF emp_natM] unfolding setsuc_empty_sing.
-  show "\<forall>u. \<not> u \<epsilon> (regperm ({{\<emptyset>}\<^sub>M}\<^sub>M))"
-    unfolding \<open>regperm ({{\<emptyset>}\<^sub>M}\<^sub>M) = \<emptyset>\<close> by (fact empty_is_empty) 
-qed
-
-lemma perm_one: "fm.binunionM fm.emptysetM (fm.singletonM fm.emptysetM) = {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M"
-proof-
-  have L: "z \<epsilon>\<^sup>f fm.binunionM fm.emptysetM (fm.singletonM fm.emptysetM) \<longleftrightarrow> z = fm.emptysetM" for z
-    unfolding fm.setext fm.binunion_def' fm.singleton_def'
-    using fm.nemp_setI fm.setsuc_def' by blast 
-  have "z \<epsilon>\<^sup>f {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<longleftrightarrow> z \<epsilon> {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M" for z
-    using singleton_def' binunion_emp nat_mem_nat nat_suc_nat
-        regperm_image_else[of "{{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M"] suc_sing_not_nat[of \<emptyset>] unfolding setsuc_empty_sing  by metis 
-  hence R: "z \<epsilon>\<^sup>f {{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<longleftrightarrow> z = fm.emptysetM" for z
-    unfolding perm_empty singleton_def'.   
-  show ?thesis 
-    unfolding fm.setext L R by blast
-qed
-
-lemma perm_else_setsuc_else: assumes "\<not> natM u" "\<nexists> b. natM b \<and> u = {setsucM b b}\<^sub>M"
-  shows "\<not> natM (setsucM u u)" "\<nexists> b. natM b \<and> setsucM u u = {setsucM b b}\<^sub>M"
-  using assms by (meson nat_mem_nat setsuc_def') (metis mem_not_refl singleton_def' setsuc_def')   
-
-lemma perm_setsuc: assumes "\<not> natM u" "\<nexists> b. natM b \<and> u = {setsucM b b}\<^sub>M"
-  shows "fm.setsucM u u = setsucM u u"
-  unfolding fm.setext unfolding fm.binunion_def' regperm_image_else[OF perm_else_setsuc_else[OF assms]] 
-  regperm_image_else[OF assms] binunion_def' singleton_def' fm.singleton_def' setsuc_def'
-  using \<open>regperm u = u\<close> fm.setsuc_def' by auto 
-
-lemma perm_fin: "L_fin (\<epsilon>\<^sup>f)"
-proof(unfold_locales, rule notI)
-  assume "\<exists>x. fm.emptysetM \<epsilon>\<^sup>f x \<and> (\<forall>y. y \<epsilon>\<^sup>f x \<longrightarrow> fm.setsucM y y \<epsilon>\<^sup>f x)"
-  then obtain x where xf: "fm.emptysetM \<epsilon>\<^sup>f x" "\<forall>y. y \<epsilon>\<^sup>f x \<longrightarrow> fm.setsucM y y \<epsilon>\<^sup>f x"
-    by blast   
-  hence mem0: "{{\<emptyset>}\<^sub>M}\<^sub>M \<epsilon>\<^sup>f x" 
-    using perm_empty by force
-  from xf(2)[rule_format, OF xf(1), unfolded perm_one] 
-  have mem1: "{{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<epsilon>\<^sup>f x"
-    using fm.binunion_emp fm.setsuc_empty_sing perm_one by force
-  hence not1: "\<not> natM x"
-    using mem0 by (metis mem_neq_singleton regperm_mem_nat) 
-  have not2: "\<nexists>b. natM b \<and> x = {setsucM b b}\<^sub>M"
-    using mem0 mem1
-    using binunion_emp nat_mem_nat regperm_image_plus suc_sing_not_nat setsuc_empty_sing by metis
-  from regperm_image_else[OF not1 not2]
-  have x: "{{\<emptyset>}\<^sub>M}\<^sub>M \<epsilon> x" "\<forall>y. y \<epsilon> x \<longrightarrow> fm.setsucM y y \<epsilon> x"
-    using xf perm_empty by force+
-  let ?P = "\<lambda> u. (\<not> natM u \<and> (\<nexists> b. natM b \<and> (u = {setsucM b b}\<^sub>M)))"
-  have sp: "SetProperty ?P"
-    unfolding SetProperty_def set_defs logsimps by (rule SFP_rules)+
-  from sep_SP[OF this, rule_format, of x]
-  obtain x' where x': "\<forall>u. (u \<epsilon> x') = (u \<epsilon> x \<and> \<not> natM u \<and> (\<nexists>b. natM b \<and> u = {setsucM b b}\<^sub>M))"
-    by blast
-  have "{{{\<emptyset>}\<^sub>M}\<^sub>M}\<^sub>M \<epsilon> x'"
-    using mem1  unfolding x'[rule_format] \<open>regperm x = x\<close>
-    using binunion_emp nat_mem_nat nat_suc_nat singleton_def' suc_sing_not_nat setsuc_empty_sing by metis 
-  hence "x' \<noteq> \<emptyset>"
-    by force
-  have x'_setsuc: "setsucM u u \<epsilon> x'" if "u \<epsilon> x'" for u
-    unfolding x'[rule_format]
-  proof(unfold conj_assoc[symmetric], rule conjI, rule conjI)  
-    note u = \<open>u \<epsilon> x'\<close>[unfolded x'[rule_format]]
-    have red: "fm.setsucM u u = setsucM u u"
-      by (rule perm_setsuc)
-      (use  \<open>u \<epsilon> x'\<close>[unfolded x'[rule_format]] in blast)+
-    show "setsucM u u \<epsilon> x"
-      by (rule  x(2)[rule_format, of u, unfolded red]) (simp add: u)
-    show "\<not> natM (setsucM u u)" "\<nexists>b. natM b \<and> setsucM u u = {setsucM b b}\<^sub>M"
-      using u perm_else_setsuc_else by blast+
-  qed
-  with max_subset_ex[OF \<open>x' \<noteq> \<emptyset>\<close>]
-  show False
-    using suc_subset by blast
-qed     
-
-interpretation find: L_setind "(\<epsilon>\<^sup>f)"
-  using L_setext_empty_power_union_repl_reg.fin_implies_setind regperm_reg perm_fin by blast
-
 end
 
 text\<open>Summary of results. 
@@ -372,24 +372,33 @@ We have shown that if a type admits a membership relation satisfying certain axi
 (namely axioms of ZF where inf is replaced by fin), 
 it does not follow that the membership on the type satisfies the existence of transitive supersets or the regularity schema.\<close>
 
-theorem not_reg_setind_implies_regsch_ts: 
-  assumes "L_setext_empty_power_union_repl_reg_fin (m :: 'a \<Rightarrow> 'a \<Rightarrow> bool)"
-  shows "\<not> (\<forall> (mem :: 'a \<Rightarrow> 'a \<Rightarrow> bool). L_setext_empty_power_union_repl_reg mem \<and> L_setind mem \<longrightarrow> L_regsch mem \<or> L_ts mem)"
+theorem not_reg_fin_implies_regsch_ts: 
+  assumes "L_setext_empty_power_repl_reg (m :: 'a \<Rightarrow> 'a \<Rightarrow> bool)" and "L_fin m" 
+  shows "\<not> (\<forall> (mem :: 'a \<Rightarrow> 'a \<Rightarrow> bool). L_setext_empty_power_union_repl_reg_fin mem \<longrightarrow> L_regsch mem \<or> L_ts mem)"
 proof (rule notI)
-  assume contr: "\<forall>(mem :: 'a \<Rightarrow> 'a \<Rightarrow> bool). L_setext_empty_power_union_repl_reg mem \<and> L_setind mem \<longrightarrow> L_regsch mem \<or> L_ts mem"
+  assume contr: "\<forall>(mem :: 'a \<Rightarrow> 'a \<Rightarrow> bool). L_setext_empty_power_union_repl_reg_fin  mem \<longrightarrow> L_regsch mem \<or> L_ts mem"
+  interpret L_setext_empty_power_repl_reg m
+    using assms by simp
+  interpret L_fin m
+    using assms by simp
+  interpret L_setext_empty_power_repl_fin m
+    by unfold_locales
   interpret L_setext_empty_power_union_repl_reg_fin m
-    using assms.
-  have L1: "L_setind fmem"
-    using L_setext_empty_power_union_repl_reg.fin_implies_setind regperm_reg perm_fin by blast
-  have L2: "L_setext_empty_power_union_repl_reg fmem"
-    using L_setext_empty_power_union_repl_def L_setext_empty_power_union_repl_reg_def regperm_reg
-    by blast
-  have L3: "L_regsch fmem \<or> L_ts fmem"
-    using L1 L2 contr by blast
-  interpret i2: L_setext_empty_power_union_repl_reg fmem
-    using L2.
-  show False
-    using L3 regperm_not_regsch regperm_not_ts by blast
+    by unfold_locales
+  interpret perm: permutation_model m regperm
+    by unfold_locales (use regperm_bij SR_regperm_mem in blast)+  
+  have "L_fin fmem"
+    using perm_fin by blast
+  have "L_setext_empty_power_repl_reg fmem"
+    using regperm_reg by auto
+  have "L_setext_empty_power_union_repl_reg_fin fmem"
+    using \<open>L_fin fmem\<close> \<open>L_setext_empty_power_repl_reg fmem\<close>
+    by (simp add: L_setext_empty_power_repl_fin.intro L_setext_empty_power_repl_reg_def
+        L_setext_empty_power_union_repl_reg_fin.intro) 
+  hence "L_regsch fmem \<or> L_ts fmem"
+    using  contr by blast
+  then show False
+    using regperm_not_regsch regperm_not_ts by blast
 qed 
 
 end

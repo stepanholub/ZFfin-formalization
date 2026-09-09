@@ -13,7 +13,7 @@ Axioms of extensionality, empty set, powerset, union, replacement and set induct
 are not sufficient to prove regularity, even in the presence of transitive superset axiom.
 
 We prove this using permutation models.
-It is enough to transpose \<open>0\<close> and \<open>1\<close> in order to obtain a model which violates regularity, cf. Theorem 13 in BaratellaFerro1993.
+It is enough to transpose \<open>0\<close> and \<open>1\<close> in order to obtain a model which violates regularity, cf. \<open>"Theorem 13" in BaratellaFerro1993\<close>
 \<close>
 
 context L_setext_empty_power_union_repl
@@ -28,9 +28,9 @@ lemma swap_zero_one_involution[simp]: "swap_zero_one (swap_zero_one x) = x"
 
 lemma bij_swap_zero_one: "bij swap_zero_one"
   by (simp add: involuntory_imp_bij swap_zero_one_def)
-  
+
 lemma swap_zero_one_mem: "a \<epsilon> swap_zero_one b \<longleftrightarrow> (b \<noteq> {\<emptyset>}\<^sub>M \<and> a \<epsilon> b) \<or> (a = \<emptyset> \<and> b = \<emptyset>)"
-  unfolding swap_zero_one_def  by (simp add: singleton_def')
+  using set_one_def set_one_mem swap_zero_one_def by auto
 
 lemma swap_zero_one_perm_model: "permutation_model (\<epsilon>) swap_zero_one"
 proof

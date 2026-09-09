@@ -10,7 +10,22 @@ begin
 text \<open>A useful tool of constructing models with specific properties is the Bernays-Rieger permutation method, 
 which redefines the membership relation. We show that a permutation model obtained in this way preserves extensionality, 
 empty set, powerset, union, and replacement. The method has been used, inter alia, in several works directly relevant to our formalization 
-Rieger1957, VopenkaHajek1963, BaratellaFerro1993, ManciniZambella2001)\<close>
+(\<open>Rieger1957\<close>, \<open>VopenkaHajek1963\<close>, \<open>BaratellaFerro1993\<close>, \<open>ManciniZambella2001\<close>)\<close>
+
+locale L_setext_empty_power_union_repl = L_setext + L_empty + L_power + L_union + L_repl
+
+begin
+
+sublocale L_setext_empty_power_repl
+  by unfold_locales
+
+sublocale L_setext_union
+  by unfold_locales
+
+sublocale L_setext_empty_union_repl_pair
+  by unfold_locales
+
+end
 
 locale permutation_model = L_setext_empty_power_union_repl +
   fixes perm
