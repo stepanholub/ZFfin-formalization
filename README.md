@@ -4,7 +4,7 @@ The axiomatization of the theory of hereditarily finite sets in first-order clas
 
 ## Requirements and usage
 
-The code is compatible with Isabelle2025-2. See [Isabelle web page](https://isabelle.in.tum.de/) for download and installation instructions.
+The code is compatible with Isabelle2025-2 and Isabelle2026. See [Isabelle web page](https://isabelle.in.tum.de/) for download and installation instructions.
 
 The (short) theory ZFfin_HF.thy depends on the [Archive of Formal Proofs](https://isa-afp.org/) (AFP) session HereditarilyFinite. To use AFP see its [Download](https://isa-afp.org/download/) and [Help](https://isa-afp.org/help/) pages.
 
